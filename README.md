@@ -59,7 +59,7 @@ scripts/chat-id.ts      # bantu ambil chat ID
 
 ## 1. Prasyarat
 
-- Node.js **20+** (disarankan 22)
+- Node.js **22** (sesuai `engines` di package.json)
 - Bot Telegram dari [@BotFather](https://t.me/BotFather)
 - API key Gemini dari [Google AI Studio](https://aistudio.google.com/apikey)
 - API key xAI (Grok) dari [console.x.ai](https://console.x.ai)
@@ -210,7 +210,7 @@ Default routing sengaja "Gemini dulu" karena jauh lebih murah. Grok hanya kepaka
 | `Grok HTTP 401` | `XAI_API_KEY` salah atau bukan key xAI |
 | `Sheets ... permission` | Spreadsheet belum di-share ke email service account (role Editor) |
 | `Sheets ... parse range` | Tab `messages` belum ada — bot harus jalan sekali dengan akses Sheets yang benar |
-| Log Sheets telat | Normal: ditulis per batch (10 baris / 30 detik) supaya hemat quota |
+| Log Sheets telat | Normal: ditulis per batch (10 baris / 30 detik) supaya hemat quota. `/stats` bisa belum menghitung log yang masih di queue |
 | `npm run chatid` kosong | Kirim pesan ke bot dulu, dan matikan bot sementara |
 
 ## 8. Keamanan

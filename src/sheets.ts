@@ -1,6 +1,7 @@
 import { google, type sheets_v4 } from "googleapis";
 import { config, sheetsEnabled } from "./config.js";
 import { logger } from "./util/logger.js";
+import { dateKey } from "./util/date.js";
 
 const TAB = "messages";
 const HEADERS = [
@@ -135,6 +136,9 @@ export async function initSheets(): Promise<void> {
 }
 
 export function logExchange(exchange: ExchangeLog): void {
+  // Kalau Sheets tidak aktif, jangan menumpuk queue di memori.
+  if (!api) return;
+
   queue.push([
     exchange.ts ?? new Date().toISOString(),
     exchange.chatId,
@@ -194,7 +198,10 @@ export async function getTodayUsage(day: string): Promise<TodayUsage | null> {
 
     for (const row of rows) {
       const ts = String(row[0] ?? "");
-      if (!ts.startsWith(day)) continue;
+      if (!ts) continue;
+
+      const rowDate = new Date(ts);
+      if (Number.isNaN(rowDate.getTime()) || dateKey(rowDate) !== day) continue;
       if (String(row[2] ?? "assistant") !== "assistant") continue;
 
       const model = String(row[3] ?? "unknown");
