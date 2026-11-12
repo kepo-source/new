@@ -1,3 +1,4 @@
+import { config } from "./config.js";
 import type { ProviderName } from "./providers/types.js";
 
 export interface RouteDecision {
@@ -8,6 +9,9 @@ export interface RouteDecision {
 /**
  * Heuristik routing sederhana dan deterministik (tanpa panggilan LLM tambahan,
  * supaya cepat dan tidak menambah biaya).
+ *
+ * Pertanyaan "berat" diarahkan ke deep provider (Grok/Groq), sisanya ke
+ * default provider (biasanya Gemini).
  */
 const DEEP_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\banali(s|sa|sis|tik)\b/i, label: "analisa" },
@@ -24,14 +28,14 @@ const DEEP_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
 
 export function pickProvider(text: string): RouteDecision {
   if (text.length > 4000) {
-    return { provider: "gemini", reason: "teks panjang" };
+    return { provider: config.defaultProvider, reason: "teks panjang" };
   }
 
   for (const { pattern, label } of DEEP_PATTERNS) {
     if (pattern.test(text)) {
-      return { provider: "grok", reason: `keyword:${label}` };
+      return { provider: config.deepProvider, reason: `keyword:${label}` };
     }
   }
 
-  return { provider: "gemini", reason: "default" };
+  return { provider: config.defaultProvider, reason: "default" };
 }

@@ -1,25 +1,33 @@
 # 🧠 second-brain
 
-Bot Telegram **second brain** dengan **multi-model router**: Gemini buat kerja cepat sehari-hari, Grok buat analisa berat, dan semua pemakaian dicatat ke **Google Sheets**.
+Bot Telegram **second brain** dengan **multi-model router**: model cepat buat kerja sehari-hari, model deep buat analisa berat, dan semua pemakaian dicatat ke **Google Sheets**.
+
+Provider yang didukung:
+
+- **Gemini** (Google AI Studio) — default, murah, konteks panjang
+- **Grok** (xAI) — deep/analisa
+- **Groq** (Groq Cloud) — alternatif cepat & murah (OpenAI-compatible)
+
+Minimal salah satu provider aktif; sisanya opsional.
 
 ```
 Telegram ──▶ grammY (Node/TS)
                  │
                  ├─ AuthGuard (whitelist chat ID)
-                 ├─ Router ──▶ Gemini (default)
-                 │        └──▶ Grok (analisa/strategi/prediksi)
-                 ├─ Fallback otomatis Gemini ⇄ Grok
+                 ├─ Router ──▶ default provider (Gemini/Groq)
+                 │        └──▶ deep provider (Grok/Groq)
+                 ├─ Fallback otomatis antar provider
                  └─ Logger (queue) ──▶ Google Sheets
 ```
 
 ## Fitur
 
 - Chat biasa langsung dijawab, model dipilih otomatis.
-- `/fast` paksa Gemini, `/deep` paksa Grok, `/banding` dua-duanya sekaligus.
-- Fallback otomatis kalau salah satu provider error/rate limit.
+- `/fast` pakai model default, `/deep` pakai model deep, `/banding` dua-duanya sekaligus.
+- Fallback otomatis antar provider kalau salah satu error/rate limit.
 - Konteks 6 putaran terakhir per chat (in-memory).
 - Log lengkap ke Sheets: model, token, latency, biaya, alasan routing.
-- Budget harian hard-cap: Grok otomatis dilewati kalau budget habis.
+- Budget harian menahan Grok (xAI) kalau sudah lewat batas.
 - `/stats` dan `/budget` buat pantau pemakaian.
 - Hanya chat ID yang di-whitelist yang bisa memakai bot.
 
@@ -29,9 +37,9 @@ Telegram ──▶ grammY (Node/TS)
 |---|---|
 | _(chat biasa)_ | Auto-route |
 | `/ask <teks>` | Auto-route |
-| `/fast <teks>` | Paksa Gemini |
-| `/deep <teks>` | Paksa Grok |
-| `/banding <teks>` | Gemini + Grok paralel |
+| `/fast <teks>` | Paksa model default |
+| `/deep <teks>` | Paksa model deep |
+| `/banding <teks>` | Default + deep paralel |
 | `/stats` | Pemakaian & biaya hari ini |
 | `/budget` | Sisa budget harian |
 | `/model` | Model aktif |
@@ -49,7 +57,7 @@ src/
 ├── memory.ts           # konteks per chat
 ├── sheets.ts           # queue log ke Google Sheets
 ├── usage.ts            # budget & counter harian
-├── providers/          # gemini.ts, grok.ts
+├── providers/          # gemini.ts, grok.ts, groq.ts (+ openai-compatible base)
 ├── commands/           # admin, ask, banding, stats
 └── util/               # logger, cost, date, text, errors
 scripts/chat-id.ts      # bantu ambil chat ID
@@ -61,8 +69,11 @@ scripts/chat-id.ts      # bantu ambil chat ID
 
 - Node.js **22** (sesuai `engines` di package.json)
 - Bot Telegram dari [@BotFather](https://t.me/BotFather)
-- API key Gemini dari [Google AI Studio](https://aistudio.google.com/apikey)
-- API key xAI (Grok) dari [console.x.ai](https://console.x.ai)
+- API key Gemini dari [Google AI Studio](https://aistudio.google.com/apikey) — opsional
+- API key xAI (Grok) dari [console.x.ai](https://console.x.ai) — opsional
+- API key Groq dari [console.groq.com](https://console.groq.com) — opsional
+
+Minimal **satu** dari ketiga API key di atas harus ada. Kalau belum punya semuanya, Groq paling gampang buat mulai (ada free tier).
 - Google Cloud project + **service account** dengan Sheets API aktif
 
 ## 2. Setup lokal
@@ -75,14 +86,19 @@ cp .env.example .env
 
 > ⚠️ Isi key di **`.env`**, bukan di `.env.example`. `.env` sudah di-gitignore; `.env.example` cuma template dan ikut ke-commit.
 
-Isi `.env` minimal:
+Isi `.env` minimal (pilih salah satu provider):
 
 ```env
 TELEGRAM_BOT_TOKEN=...
 ALLOWED_CHAT_IDS=123456789
+
+# salah satu / lebih:
 GEMINI_API_KEY=...
-XAI_API_KEY=...
+# XAI_API_KEY=...
+# GROQ_API_KEY=...
 ```
+
+> **Groq ≠ Grok.** Groq Cloud (`gsk_...`) itu provider inference untuk Llama/gpt-oss/Qwen. Grok (`xai-...`) itu model dari xAI. Kalau key `gsk_` ditaruh di `XAI_API_KEY`, bot otomatis memakainya sebagai provider Groq (dengan peringatan di log).
 
 Jalankan:
 
@@ -158,6 +174,8 @@ git push -u origin main
    - `ALLOWED_CHAT_IDS`
    - `GEMINI_API_KEY`, `GEMINI_MODEL`
    - `XAI_API_KEY`, `GROK_MODEL`
+   - `GROQ_API_KEY`, `GROQ_MODEL`
+   - `DEFAULT_PROVIDER`, `DEEP_PROVIDER`
    - `GOOGLE_SHEETS_ID`, `GOOGLE_SA_B64`
    - `DAILY_BUDGET_USD`, `TZ`, `LOG_LEVEL`
 4. Railway otomatis build pakai `railway.json` dan start `npm start`.
@@ -175,31 +193,40 @@ git push -u origin main
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | ✅ | – | Token dari BotFather |
 | `ALLOWED_CHAT_IDS` | ✅ | – | Pisahkan dengan koma |
-| `GEMINI_API_KEY` | ✅ | – | API key Google AI Studio |
+| `GEMINI_API_KEY` | – | – | API key Google AI Studio (`AIza...`) |
 | `GEMINI_MODEL` | – | `gemini-2.5-flash` | Ganti kalau mau model lain |
-| `XAI_API_KEY` | ✅ | – | API key xAI |
-| `GROK_MODEL` | – | `grok-4` | Sesuaikan dengan model yang tersedia di akun lo |
+| `XAI_API_KEY` | – | – | API key xAI (`xai-...`) untuk Grok |
+| `GROK_MODEL` | – | `grok-4` | Sesuaikan dengan model xAI yang tersedia |
 | `XAI_BASE_URL` | – | `https://api.x.ai/v1` | Biasanya tidak perlu diubah |
-| `GOOGLE_SHEETS_ID` | – | – | ID spreadsheet |
+| `GROQ_API_KEY` | – | – | API key Groq Cloud (`gsk_...`) |
+| `GROQ_MODEL` | – | `openai/gpt-oss-120b` | Model Groq yang dipakai |
+| `GROQ_BASE_URL` | – | `https://api.groq.com/openai/v1` | OpenAI-compatible endpoint |
+| `DEFAULT_PROVIDER` | – | `gemini` → `groq` → `grok` | Provider buat chat biasa |
+| `DEEP_PROVIDER` | – | `grok` → `groq` → `gemini` | Provider buat `/deep` & keyword analisa |
+| `GOOGLE_SHEETS_ID` | – | – | ID spreadsheet (boleh URL lengkap) |
 | `GOOGLE_SA_B64` | – | – | Service account JSON, base64 |
-| `DAILY_BUDGET_USD` | – | `1.00` | Hard cap biaya harian |
+| `DAILY_BUDGET_USD` | – | `1.00` | Batas biaya harian untuk Grok xAI |
 | `TZ` | – | `Asia/Jakarta` | Timezone untuk tanggal & reset budget |
 | `LOG_LEVEL` | – | `info` | `debug` / `info` / `warn` / `error` |
 | `PORT` | – | `8080` | Diisi otomatis oleh Railway |
 
+> Minimal satu dari `GEMINI_API_KEY` / `XAI_API_KEY` / `GROQ_API_KEY` harus diisi, kalau tidak bot menolak start dengan pesan jelas.
+
 ### Ganti model
 
-Cukup ubah env `GEMINI_MODEL` / `GROK_MODEL`, restart. Kalau nama model salah, provider akan error dan bot kasih tahu di chat/log.
+Cukup ubah env `GEMINI_MODEL` / `GROK_MODEL` / `GROQ_MODEL`, restart. Kalau nama model salah, provider akan error dan bot kasih tahu di chat/log.
 
 ### Ubah aturan routing
 
-Edit `src/router.ts`, bagian `DEEP_PATTERNS`. Keyword yang match akan diarahkan ke Grok; sisanya Gemini.
+Edit `src/router.ts`, bagian `DEEP_PATTERNS`. Keyword yang match akan diarahkan ke `DEEP_PROVIDER`; sisanya `DEFAULT_PROVIDER`.
+
+Contoh: kalau cuma punya key Groq, set `DEFAULT_PROVIDER=groq` dan `DEEP_PROVIDER=groq`, lalu ganti `GROQ_MODEL` ke model yang lebih kuat (misal `qwen/qwen3.8-27b` atau `openai/gpt-oss-120b`).
 
 ## 6. Biaya
 
-Harga token di `src/util/cost.ts` adalah **perkiraan** (USD per 1 juta token) — sesuaikan dengan pricing terbaru provider. Budget cap dihitung dari tabel itu, jadi kalau harga berubah, update juga tabelnya.
+Harga token di `src/util/cost.ts` adalah **perkiraan** (USD per 1 juta token) — sesuaikan dengan pricing terbaru provider. Budget harian dihitung dari tabel itu, jadi kalau harga berubah, update juga tabelnya.
 
-Default routing sengaja "Gemini dulu" karena jauh lebih murah. Grok hanya kepakai untuk pertanyaan berat atau kalau diminta eksplisit.
+Budget hanya menahan **Grok xAI** (provider termahal). Gemini dan Groq tetap jalan walau budget habis, supaya bot nggak mati total. Kalau Grok satu-satunya provider aktif, Grok tetap dipakai dengan peringatan.
 
 ## 7. Troubleshooting
 
@@ -212,6 +239,9 @@ Default routing sengaja "Gemini dulu" karena jauh lebih murah. Grok hanya kepaka
 | `Grok HTTP 400` / `Incorrect API key` | Pastikan itu key **xAI** (`xai-...`) dari console.x.ai, bukan key **Groq Cloud** (`gsk_...`) dari console.groq.com |
 | `Grok HTTP 404 model not found` | Ganti `GROK_MODEL` sesuai model yang tersedia di akun xAI lo |
 | `Grok HTTP 401` | `XAI_API_KEY` salah atau bukan key xAI |
+| `Groq HTTP 401` | `GROQ_API_KEY` salah/revoked — cek console.groq.com |
+| `Groq HTTP 404` | `GROQ_MODEL` tidak tersedia di akun lo; cek daftar model Groq |
+| Key `gsk_...` bikin error Grok | Itu key Groq. Pindahkan ke `GROQ_API_KEY` (bot juga auto-detect kalau ditaruh di `XAI_API_KEY`) |
 | `Sheets ... permission` | Spreadsheet belum di-share ke email service account (role Editor) |
 | `Sheets ... parse range` | Tab `messages` belum ada — bot harus jalan sekali dengan akses Sheets yang benar |
 | Log Sheets telat | Normal: ditulis per batch (10 baris / 30 detik) supaya hemat quota. `/stats` bisa belum menghitung log yang masih di queue |

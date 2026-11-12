@@ -1,17 +1,39 @@
 import type { Context } from "grammy";
 import { SYSTEM_PROMPT } from "./config.js";
 import { appendAssistant, appendUser, getHistory } from "./memory.js";
-import { otherProvider, providers } from "./providers/index.js";
+import {
+  availableProviders,
+  getProvider,
+  providerLabel,
+} from "./providers/index.js";
 import type { ChatResponse, ProviderName } from "./providers/types.js";
 import { pickProvider } from "./router.js";
 import { logExchange } from "./sheets.js";
 import { estimateCost, formatUsd } from "./util/cost.js";
 import { errorMessage } from "./util/errors.js";
 import { logger } from "./util/logger.js";
-import { chunkText } from "./util/text.js";
+import { redactString } from "./util/redact.js";
+import { chunkText, truncate } from "./util/text.js";
 import { hasBudget, record, seedUsage } from "./usage.js";
 
 const MAX_PROMPT_CHARS = 6000;
+
+/** Urutan fallback: murah dan umum dulu. */
+const PREFERENCE: ProviderName[] = ["gemini", "groq", "grok"];
+
+/** Budget harian hanya menahan provider mahal (Grok xAI). */
+function budgetBlocked(name: ProviderName): boolean {
+  return name === "grok" && !hasBudget();
+}
+
+function buildOrder(primary: ProviderName): ProviderName[] {
+  return [
+    primary,
+    ...PREFERENCE.filter(
+      (name) => name !== primary && availableProviders.includes(name),
+    ),
+  ];
+}
 
 export async function safeTyping(ctx: Context): Promise<void> {
   try {
@@ -79,14 +101,19 @@ export async function runChat(
   let primaryName: ProviderName = decision.provider;
   let note = "";
 
-  if (primaryName === "grok" && !hasBudget()) {
-    primaryName = "gemini";
-    note = "⚠️ Budget harian habis, request dialihkan ke Gemini.\n\n";
-  }
+  if (budgetBlocked(primaryName)) {
+    const alternative = buildOrder(primaryName).find(
+      (name) => !budgetBlocked(name) && name !== primaryName,
+    );
 
-  const primary = providers[primaryName];
-  const fallbackName = otherProvider(primaryName);
-  const fallback = providers[fallbackName];
+    if (alternative) {
+      note = `⚠️ Budget harian habis, request dialihkan ke ${providerLabel(alternative)}.\n\n`;
+      primaryName = alternative;
+    } else {
+      note =
+        "⚠️ Budget harian sudah lewat, tapi Grok satu-satunya provider aktif.\n\n";
+    }
+  }
 
   const request = {
     messages: [
@@ -98,42 +125,39 @@ export async function runChat(
 
   await safeTyping(ctx);
 
-  let response: ChatResponse;
+  const order = buildOrder(primaryName);
+  const allowed = order.filter((name) => !budgetBlocked(name));
+  const tryOrder = allowed.length > 0 ? allowed : order;
+
+  let response: ChatResponse | undefined;
   let usedName: ProviderName = primaryName;
-  let usedModel = primary.model;
+  const failures: string[] = [];
 
-  try {
-    response = await primary.chat(request);
-  } catch (primaryError) {
-    logger.warn(
-      { err: primaryError, provider: primary.name },
-      "Provider utama gagal, coba fallback",
-    );
-
-    if (fallbackName === "grok" && !hasBudget()) {
-      await ctx.reply(
-        `❌ ${primary.name} gagal dan budget Grok sudah habis.\n${errorMessage(primaryError)}`,
-      );
-      return;
-    }
-
+  for (const name of tryOrder) {
     try {
-      response = await fallback.chat(request);
-      usedName = fallbackName;
-      usedModel = fallback.model;
-      note += `⚠️ ${primary.name} gagal, fallback ke ${fallback.name}.\n\n`;
-    } catch (fallbackError) {
-      logger.error(
-        { err: fallbackError, provider: fallback.name },
-        "Fallback juga gagal",
+      response = await getProvider(name).chat(request);
+      usedName = name;
+      break;
+    } catch (error) {
+      failures.push(
+        `${providerLabel(name)}: ${truncate(redactString(errorMessage(error)), 220)}`,
       );
-      await ctx.reply(
-        `❌ Dua provider gagal.\n\n${primary.name}: ${errorMessage(primaryError)}\n${fallback.name}: ${errorMessage(fallbackError)}`,
-      );
-      return;
+      logger.warn({ err: error, provider: name }, "Provider gagal, coba berikutnya");
     }
   }
 
+  if (!response) {
+    await ctx.reply(
+      `❌ Semua provider gagal.\n\n${failures.join("\n") || "Tidak ada provider aktif."}`,
+    );
+    return;
+  }
+
+  if (usedName !== primaryName) {
+    note += `⚠️ ${providerLabel(primaryName)} gagal, fallback ke ${providerLabel(usedName)}.\n\n`;
+  }
+
+  const usedModel = response.model;
   const cost = estimateCost(usedModel, response.tokensIn, response.tokensOut);
 
   record(usedModel, response.tokensIn, response.tokensOut, cost);

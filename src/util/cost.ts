@@ -9,6 +9,10 @@ const PRICES: Record<string, { input: number; output: number }> = {
   "grok-4": { input: 3, output: 15 },
   "grok-3": { input: 3, output: 15 },
   "grok-3-mini": { input: 0.3, output: 0.5 },
+  "openai/gpt-oss-120b": { input: 0.15, output: 0.75 },
+  "openai/gpt-oss-20b": { input: 0.075, output: 0.3 },
+  "qwen/qwen3.8-27b": { input: 0.29, output: 0.59 },
+  "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
 };
 
 const FALLBACK = { input: 1, output: 3 };

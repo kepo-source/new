@@ -1,4 +1,5 @@
 import "dotenv/config";
+import type { ProviderName } from "./providers/types.js";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -47,17 +48,101 @@ function parseChatIds(raw: string): Set<number> {
   return new Set(ids);
 }
 
+function normalizeBaseUrl(raw: string, fallback: string): string {
+  return (raw || fallback).replace(/\/$/, "");
+}
+
+// === Provider LLM ===
+const geminiKey = optional("GEMINI_API_KEY");
+const xaiRaw = optional("XAI_API_KEY");
+const groqRaw = optional("GROQ_API_KEY");
+
+// Toleransi umum: key Groq (gsk_...) tidak sengaja ditaruh di XAI_API_KEY.
+const xaiKeyIsGroq = xaiRaw.startsWith("gsk_");
+const xaiKey = xaiKeyIsGroq ? "" : xaiRaw;
+const groqKey = groqRaw || (xaiKeyIsGroq ? xaiRaw : "");
+
+const availableProviders: ProviderName[] = [];
+if (geminiKey) availableProviders.push("gemini");
+if (xaiKey) availableProviders.push("grok");
+if (groqKey) availableProviders.push("groq");
+
+if (availableProviders.length === 0) {
+  throw new Error(
+    "Minimal satu provider LLM harus diisi: GEMINI_API_KEY, XAI_API_KEY, atau GROQ_API_KEY.",
+  );
+}
+
+const configWarnings: string[] = [];
+
+if (xaiKeyIsGroq) {
+  configWarnings.push(
+    "XAI_API_KEY berisi key Groq (gsk_...). Otomatis dipakai sebagai provider Groq, bukan xAI.",
+  );
+}
+
+if (geminiKey.startsWith("AQ.")) {
+  configWarnings.push(
+    "GEMINI_API_KEY berawalan 'AQ.' — format baru AI Studio yang sering ditolak Gemini API. Regenerate sampai dapat key 'AIza...'.",
+  );
+}
+
+function resolveProvider(
+  envName: string,
+  fallbackOrder: ProviderName[],
+): ProviderName {
+  const requested = optional(envName).toLowerCase();
+
+  if (requested) {
+    if ((availableProviders as string[]).includes(requested)) {
+      return requested as ProviderName;
+    }
+    configWarnings.push(
+      `${envName}=${requested} tidak tersedia (key belum diisi). Pakai provider lain yang aktif.`,
+    );
+  }
+
+  const first = fallbackOrder.find((name) => availableProviders.includes(name));
+  if (!first) {
+    throw new Error(`Tidak ada provider yang bisa dipakai untuk ${envName}.`);
+  }
+  return first;
+}
+
+const defaultProvider = resolveProvider("DEFAULT_PROVIDER", [
+  "gemini",
+  "groq",
+  "grok",
+]);
+
+const deepProvider = resolveProvider("DEEP_PROVIDER", [
+  "grok",
+  "groq",
+  "gemini",
+]);
+
 export const config = {
   telegramToken: telegramToken(),
   allowedChatIds: parseChatIds(optional("ALLOWED_CHAT_IDS")),
+  availableProviders,
+  defaultProvider,
+  deepProvider,
   gemini: {
-    apiKey: required("GEMINI_API_KEY"),
+    apiKey: geminiKey,
     model: optional("GEMINI_MODEL", "gemini-2.5-flash"),
   },
   grok: {
-    apiKey: required("XAI_API_KEY"),
+    apiKey: xaiKey,
     model: optional("GROK_MODEL", "grok-4"),
-    baseUrl: optional("XAI_BASE_URL", "https://api.x.ai/v1").replace(/\/$/, ""),
+    baseUrl: normalizeBaseUrl(optional("XAI_BASE_URL"), "https://api.x.ai/v1"),
+  },
+  groq: {
+    apiKey: groqKey,
+    model: optional("GROQ_MODEL", "openai/gpt-oss-120b"),
+    baseUrl: normalizeBaseUrl(
+      optional("GROQ_BASE_URL"),
+      "https://api.groq.com/openai/v1",
+    ),
   },
   sheets: {
     spreadsheetId: normalizeSheetId(optional("GOOGLE_SHEETS_ID")),
@@ -68,6 +153,8 @@ export const config = {
   logLevel: optional("LOG_LEVEL", "info"),
   timezone: optional("TZ", "Asia/Jakarta"),
 } as const;
+
+export { configWarnings };
 
 export const sheetsEnabled = Boolean(
   config.sheets.spreadsheetId && config.sheets.serviceAccountB64,

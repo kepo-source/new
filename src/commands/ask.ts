@@ -1,5 +1,6 @@
 import type { Bot, Context } from "grammy";
 import { runChat } from "../chat.js";
+import { config } from "../config.js";
 
 function commandPrompt(ctx: Context): string {
   return typeof ctx.match === "string" ? ctx.match.trim() : "";
@@ -12,15 +13,15 @@ export function registerAsk(bot: Bot): void {
 
   bot.command("fast", async (ctx) => {
     await runChat(ctx, commandPrompt(ctx), {
-      forced: "gemini",
-      routeLabel: "manual:gemini",
+      forced: config.defaultProvider,
+      routeLabel: `manual:${config.defaultProvider}`,
     });
   });
 
   bot.command("deep", async (ctx) => {
     await runChat(ctx, commandPrompt(ctx), {
-      forced: "grok",
-      routeLabel: "manual:grok",
+      forced: config.deepProvider,
+      routeLabel: `manual:${config.deepProvider}`,
     });
   });
 

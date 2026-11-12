@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { Bot } from "grammy";
-import { config } from "./config.js";
+import { config, configWarnings } from "./config.js";
+import { availableProviders } from "./providers/index.js";
 import { registerAdmin } from "./commands/admin.js";
 import { registerAsk } from "./commands/ask.js";
 import { registerBanding } from "./commands/banding.js";
@@ -96,16 +97,8 @@ process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 // === Peringatan konfigurasi yang sering bikin bingung ===
-if (config.gemini.apiKey.startsWith("AQ.")) {
-  logger.warn(
-    "GEMINI_API_KEY berawalan 'AQ.' — format baru AI Studio yang sering ditolak Gemini API. Regenerate sampai dapat key 'AIza...'.",
-  );
-}
-
-if (config.grok.apiKey.startsWith("gsk_")) {
-  logger.warn(
-    "XAI_API_KEY kelihatan seperti key Groq Cloud ('gsk_...'), bukan xAI ('xai-...'). Grok butuh key dari console.x.ai.",
-  );
+for (const warning of configWarnings) {
+  logger.warn(warning);
 }
 
 // === Bootstrap ===
@@ -115,9 +108,9 @@ await seedUsage();
 try {
   await bot.api.setMyCommands([
     { command: "ask", description: "Tanya (auto pilih model)" },
-    { command: "fast", description: "Paksa Gemini (cepat)" },
-    { command: "deep", description: "Paksa Grok (analisa)" },
-    { command: "banding", description: "Bandingin Gemini vs Grok" },
+    { command: "fast", description: "Model default (cepat/murah)" },
+    { command: "deep", description: "Model deep (analisa)" },
+    { command: "banding", description: "Bandingin dua model" },
     { command: "stats", description: "Pemakaian & biaya hari ini" },
     { command: "budget", description: "Sisa budget harian" },
     { command: "model", description: "Model yang aktif" },
@@ -135,6 +128,9 @@ bot.start({
         bot: info.username,
         allowedChatIds: config.allowedChatIds.size,
         sheets: sheetsReady(),
+        providers: availableProviders,
+        defaultProvider: config.defaultProvider,
+        deepProvider: config.deepProvider,
         budgetUsd: config.budgetUsd,
       },
       "Bot jalan",

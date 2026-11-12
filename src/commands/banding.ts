@@ -1,7 +1,11 @@
 import type { Bot, Context } from "grammy";
-import { SYSTEM_PROMPT } from "../config.js";
+import { SYSTEM_PROMPT, config } from "../config.js";
 import { appendAssistant, appendUser, getHistory } from "../memory.js";
-import { providers } from "../providers/index.js";
+import {
+  PROVIDER_EMOJI,
+  getProvider,
+  providerLabel,
+} from "../providers/index.js";
 import type { ChatResponse, ProviderName } from "../providers/types.js";
 import { logExchange } from "../sheets.js";
 import { estimateCost, formatUsd } from "../util/cost.js";
@@ -12,14 +16,13 @@ import { hasBudget, record, seedUsage } from "../usage.js";
 import { safeTyping, sendLong } from "../chat.js";
 
 function section(
-  emoji: string,
-  name: string,
+  name: ProviderName,
   response: ChatResponse,
   cost: number,
 ): string {
   const seconds = (response.latencyMs / 1000).toFixed(1);
   return [
-    `${emoji} ${name} · ${response.model}`,
+    `${PROVIDER_EMOJI[name]} ${providerLabel(name).toUpperCase()} · ${response.model}`,
     response.text,
     `· ${seconds}s · ${formatUsd(cost)}`,
   ].join("\n");
@@ -38,6 +41,18 @@ export function registerBanding(bot: Bot): void {
       return;
     }
 
+    const pair: ProviderName[] = [config.defaultProvider];
+    if (config.deepProvider !== config.defaultProvider) {
+      pair.push(config.deepProvider);
+    }
+
+    if (pair.length < 2) {
+      await ctx.reply(
+        `🆚 /banding butuh dua provider berbeda.\nSekarang cuma aktif: ${providerLabel(config.defaultProvider)} (${getProvider(config.defaultProvider).model}).\n\nTambah key Gemini atau xAI biar bisa banding.`,
+      );
+      return;
+    }
+
     await seedUsage();
     await safeTyping(ctx);
 
@@ -49,25 +64,23 @@ export function registerBanding(bot: Bot): void {
       system: SYSTEM_PROMPT,
     };
 
-    const grokAllowed = hasBudget();
+    const skipped: ProviderName[] = [];
     const tasks: Array<{
       name: ProviderName;
-      emoji: string;
       promise: Promise<ChatResponse>;
-    }> = [
-      {
-        name: "gemini",
-        emoji: "🟦",
-        promise: providers.gemini.chat(request),
-      },
-    ];
+    }> = [];
 
-    if (grokAllowed) {
-      tasks.push({
-        name: "grok",
-        emoji: "🟧",
-        promise: providers.grok.chat(request),
-      });
+    for (const name of pair) {
+      if (name === "grok" && !hasBudget()) {
+        skipped.push(name);
+        continue;
+      }
+      tasks.push({ name, promise: getProvider(name).chat(request) });
+    }
+
+    if (tasks.length === 0) {
+      await ctx.reply("⚠️ Budget harian habis dan tidak ada provider yang bisa dipakai.");
+      return;
     }
 
     const settled = await Promise.allSettled(tasks.map((task) => task.promise));
@@ -102,15 +115,12 @@ export function registerBanding(bot: Bot): void {
         });
 
         compactHistory.push(
-          `${task.name}: ${truncate(response.text, 500)}`,
+          `${providerLabel(task.name)}: ${truncate(response.text, 500)}`,
         );
-        blocks.push(
-          section(task.emoji, task.name.toUpperCase(), response, cost),
-          "",
-        );
+        blocks.push(section(task.name, response, cost), "");
       } else {
         blocks.push(
-          `${task.emoji} ${task.name.toUpperCase()}\n❌ gagal: ${errorMessage(result.reason)}`,
+          `${PROVIDER_EMOJI[task.name]} ${providerLabel(task.name).toUpperCase()}\n❌ gagal: ${errorMessage(result.reason)}`,
           "",
         );
         logger.warn(
@@ -120,8 +130,10 @@ export function registerBanding(bot: Bot): void {
       }
     });
 
-    if (!grokAllowed) {
-      blocks.push("⚠️ Grok dilewati karena budget harian habis.");
+    if (skipped.length > 0) {
+      blocks.push(
+        `⚠️ ${skipped.map((name) => providerLabel(name)).join(", ")} dilewati karena budget harian habis.`,
+      );
     }
 
     if (successCount === 0) {

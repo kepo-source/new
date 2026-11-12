@@ -1,7 +1,11 @@
 import type { Bot } from "grammy";
 import { config } from "../config.js";
 import { clearHistory, historySize } from "../memory.js";
-import { providers } from "../providers/index.js";
+import {
+  availableProviders,
+  getProvider,
+  providerLabel,
+} from "../providers/index.js";
 
 export function registerAdmin(bot: Bot): void {
   bot.command("start", async (ctx) => {
@@ -10,12 +14,12 @@ export function registerAdmin(bot: Bot): void {
       [
         `Halo ${name} 👋`,
         "",
-        "Gw second brain lo: satu bot, dua otak (Gemini + Grok), log ke Google Sheets.",
+        "Gw second brain lo: satu bot, multi-model, log ke Google Sheets.",
         "",
         "Chat biasa → auto-route.",
         "/ask <teks> → auto",
-        "/fast <teks> → paksa Gemini",
-        "/deep <teks> → paksa Grok",
+        "/fast <teks> → model default (cepat/murah)",
+        "/deep <teks> → model deep (analisa)",
         "/banding <teks> → dua model sekaligus",
         "/stats → pemakaian & biaya hari ini",
         "/budget → sisa budget",
@@ -44,16 +48,24 @@ export function registerAdmin(bot: Bot): void {
   });
 
   bot.command("model", async (ctx) => {
-    await ctx.reply(
-      [
-        "🧠 Model aktif:",
-        `• Gemini → ${providers.gemini.model}`,
-        `• Grok → ${providers.grok.model}`,
-        "",
-        `Auto-route: Grok untuk analisa/strategi/prediksi, sisanya Gemini.`,
-        `Budget harian: $${config.budgetUsd.toFixed(2)}`,
-      ].join("\n"),
+    const lines = ["🧠 Model aktif:"];
+
+    for (const name of availableProviders) {
+      const provider = getProvider(name);
+      const tags: string[] = [];
+      if (name === config.defaultProvider) tags.push("default");
+      if (name === config.deepProvider) tags.push("deep");
+      const suffix = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+      lines.push(`• ${providerLabel(name)} → ${provider.model}${suffix}`);
+    }
+
+    lines.push(
+      "",
+      "Auto-route: pertanyaan analisa/strategi/prediksi → deep, sisanya default.",
+      `Budget harian: $${config.budgetUsd.toFixed(2)} (menahan Grok xAI)`,
     );
+
+    await ctx.reply(lines.join("\n"));
   });
 
   bot.command("reset", async (ctx) => {
