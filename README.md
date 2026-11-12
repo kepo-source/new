@@ -2,20 +2,20 @@
 
 Bot Telegram **second brain** dengan **multi-model router**: model cepat buat kerja sehari-hari, model deep buat analisa berat, dan semua pemakaian dicatat ke **Google Sheets**.
 
-Provider yang didukung:
+Defaultnya pakai **Groq** (cepat + murah). Provider lain opsional:
 
-- **Gemini** (Google AI Studio) — default, murah, konteks panjang
-- **Grok** (xAI) — deep/analisa
-- **Groq** (Groq Cloud) — alternatif cepat & murah (OpenAI-compatible)
+- **Groq** (Groq Cloud) — provider utama (OpenAI-compatible)
+- **Gemini** (Google AI Studio) — opsional
+- **Grok** (xAI) — opsional untuk analisa berat
 
-Minimal salah satu provider aktif; sisanya opsional.
+Cukup satu provider aktif; kalau cuma punya key Groq, bot jalan penuh.
 
 ```
 Telegram ──▶ grammY (Node/TS)
                  │
                  ├─ AuthGuard (whitelist chat ID)
-                 ├─ Router ──▶ default provider (Gemini/Groq)
-                 │        └──▶ deep provider (Grok/Groq)
+                 ├─ Router ──▶ default provider (Groq)
+                 │        └──▶ deep provider (Groq)
                  ├─ Fallback otomatis antar provider
                  └─ Logger (queue) ──▶ Google Sheets
 ```
@@ -28,7 +28,7 @@ Telegram ──▶ grammY (Node/TS)
 - Provider yang kena 401/403 otomatis cooldown 15 menit (429 cooldown 60 detik), jadi chat berikutnya nggak nunggu provider rusak.
 - Konteks 6 putaran terakhir per chat (in-memory).
 - Log lengkap ke Sheets: model, token, latency, biaya, alasan routing.
-- Budget harian menahan Grok (xAI) kalau sudah lewat batas.
+- Budget harian (hanya relevan kalau provider xAI/Grok aktif).
 - `/stats` dan `/budget` buat pantau pemakaian.
 - Hanya chat ID yang di-whitelist yang bisa memakai bot.
 
@@ -70,12 +70,9 @@ scripts/chat-id.ts      # bantu ambil chat ID
 
 - Node.js **22** (sesuai `engines` di package.json)
 - Bot Telegram dari [@BotFather](https://t.me/BotFather)
-- API key Gemini dari [Google AI Studio](https://aistudio.google.com/apikey) — opsional
-- API key xAI (Grok) dari [console.x.ai](https://console.x.ai) — opsional
-- API key Groq dari [console.groq.com](https://console.groq.com) — opsional
-
-Minimal **satu** dari ketiga API key di atas harus ada. Kalau belum punya semuanya, Groq paling gampang buat mulai (ada free tier).
-- Google Cloud project + **service account** dengan Sheets API aktif
+- API key **Groq** dari [console.groq.com](https://console.groq.com) — cukup ini saja
+- _(opsional)_ API key Gemini / xAI kalau mau fallback multi-provider
+- Google Cloud project + **service account** dengan Sheets API aktif (opsional, buat logging)
 
 ## 2. Setup lokal
 
@@ -87,16 +84,12 @@ cp .env.example .env
 
 > ⚠️ Isi key di **`.env`**, bukan di `.env.example`. `.env` sudah di-gitignore; `.env.example` cuma template dan ikut ke-commit.
 
-Isi `.env` minimal (pilih salah satu provider):
+Isi `.env` minimal (Groq saja cukup):
 
 ```env
 TELEGRAM_BOT_TOKEN=...
 ALLOWED_CHAT_IDS=123456789
-
-# salah satu / lebih:
-GEMINI_API_KEY=...
-# XAI_API_KEY=...
-# GROQ_API_KEY=...
+GROQ_API_KEY=gsk_...
 ```
 
 > **Groq ≠ Grok.** Groq Cloud (`gsk_...`) itu provider inference untuk Llama/gpt-oss/Qwen. Grok (`xai-...`) itu model dari xAI. Kalau key `gsk_` ditaruh di `XAI_API_KEY`, bot otomatis memakainya sebagai provider Groq (dengan peringatan di log).
@@ -228,7 +221,7 @@ Contoh: kalau cuma punya key Groq, set `DEFAULT_PROVIDER=groq` dan `DEEP_PROVIDE
 
 Harga token di `src/util/cost.ts` adalah **perkiraan** (USD per 1 juta token) — sesuaikan dengan pricing terbaru provider. Budget harian dihitung dari tabel itu, jadi kalau harga berubah, update juga tabelnya.
 
-Budget hanya menahan **Grok xAI** (provider termahal). Gemini dan Groq tetap jalan walau budget habis, supaya bot nggak mati total. Kalau Grok satu-satunya provider aktif, Grok tetap dipakai dengan peringatan.
+Budget hanya menahan **Grok xAI** (provider termahal) dan tidak berpengaruh selama cuma Groq yang dipakai. Gemini dan Groq tetap jalan walau budget habis, supaya bot nggak mati total. Kalau Grok satu-satunya provider aktif, Grok tetap dipakai dengan peringatan.
 
 ## 7. Troubleshooting
 

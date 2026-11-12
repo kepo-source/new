@@ -64,7 +64,7 @@ export function registerAdmin(bot: Bot): void {
     lines.push(
       "",
       "Auto-route: pertanyaan analisa/strategi/prediksi → deep, sisanya default.",
-      `Budget harian: $${config.budgetUsd.toFixed(2)} (menahan Grok xAI)`,
+      `Budget harian: $${config.budgetUsd.toFixed(2)} (menahan provider mahal)`,
     );
 
     await ctx.reply(lines.join("\n"));
