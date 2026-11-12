@@ -25,6 +25,7 @@ Telegram ──▶ grammY (Node/TS)
 - Chat biasa langsung dijawab, model dipilih otomatis.
 - `/fast` pakai model default, `/deep` pakai model deep, `/banding` dua-duanya sekaligus.
 - Fallback otomatis antar provider kalau salah satu error/rate limit.
+- Provider yang kena 401/403 otomatis cooldown 15 menit (429 cooldown 60 detik), jadi chat berikutnya nggak nunggu provider rusak.
 - Konteks 6 putaran terakhir per chat (in-memory).
 - Log lengkap ke Sheets: model, token, latency, biaya, alasan routing.
 - Budget harian menahan Grok (xAI) kalau sudah lewat batas.
@@ -244,6 +245,8 @@ Budget hanya menahan **Grok xAI** (provider termahal). Gemini dan Groq tetap jal
 | Key `gsk_...` bikin error Grok | Itu key Groq. Pindahkan ke `GROQ_API_KEY` (bot juga auto-detect kalau ditaruh di `XAI_API_KEY`) |
 | `Sheets ... permission` | Spreadsheet belum di-share ke email service account (role Editor) |
 | `Sheets ... parse range` | Tab `messages` belum ada — bot harus jalan sekali dengan akses Sheets yang benar |
+| `GOOGLE_SA_B64 bukan JSON base64` | Jangan paste isi file mentah ke `.env`. Harus **base64 satu baris**: `base64 -w0 service-account.json` |
+| `Sheets ... not found` / `permission` | `GOOGLE_SHEETS_ID` harus ID 44 karakter dari URL spreadsheet (bukan nama tab), dan spreadsheet sudah di-share ke `client_email` service account |
 | Log Sheets telat | Normal: ditulis per batch (10 baris / 30 detik) supaya hemat quota. `/stats` bisa belum menghitung log yang masih di queue |
 | `npm run chatid` kosong | Kirim pesan ke bot dulu, dan matikan bot sementara |
 

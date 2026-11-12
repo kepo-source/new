@@ -6,6 +6,7 @@ import {
   getProvider,
   providerLabel,
 } from "../providers/index.js";
+import { isCoolingDown } from "../cooldown.js";
 
 export function registerAdmin(bot: Bot): void {
   bot.command("start", async (ctx) => {
@@ -55,6 +56,7 @@ export function registerAdmin(bot: Bot): void {
       const tags: string[] = [];
       if (name === config.defaultProvider) tags.push("default");
       if (name === config.deepProvider) tags.push("deep");
+      if (isCoolingDown(name)) tags.push("cooldown");
       const suffix = tags.length > 0 ? ` (${tags.join(", ")})` : "";
       lines.push(`• ${providerLabel(name)} → ${provider.model}${suffix}`);
     }

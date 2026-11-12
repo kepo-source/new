@@ -148,7 +148,10 @@ export const config = {
     spreadsheetId: normalizeSheetId(optional("GOOGLE_SHEETS_ID")),
     serviceAccountB64: optional("GOOGLE_SA_B64"),
   },
-  budgetUsd: Math.max(0, Number(optional("DAILY_BUDGET_USD", "1")) || 1),
+  budgetUsd: (() => {
+    const raw = Number(optional("DAILY_BUDGET_USD", "1"));
+    return Number.isFinite(raw) ? Math.max(0, raw) : 1;
+  })(),
   port: Number(process.env.PORT ?? 8080),
   logLevel: optional("LOG_LEVEL", "info"),
   timezone: optional("TZ", "Asia/Jakarta"),

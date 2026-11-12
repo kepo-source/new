@@ -15,6 +15,8 @@ import { logger } from "./util/logger.js";
 import { redactString } from "./util/redact.js";
 import { chunkText, truncate } from "./util/text.js";
 import { hasBudget, record, seedUsage } from "./usage.js";
+import { isCoolingDown, markProviderFailure } from "./cooldown.js";
+import { ProviderError } from "./util/errors.js";
 
 const MAX_PROMPT_CHARS = 6000;
 
@@ -103,7 +105,8 @@ export async function runChat(
 
   if (budgetBlocked(primaryName)) {
     const alternative = buildOrder(primaryName).find(
-      (name) => !budgetBlocked(name) && name !== primaryName,
+      (name) =>
+        !budgetBlocked(name) && name !== primaryName && !isCoolingDown(name),
     );
 
     if (alternative) {
@@ -126,7 +129,10 @@ export async function runChat(
   await safeTyping(ctx);
 
   const order = buildOrder(primaryName);
-  const allowed = order.filter((name) => !budgetBlocked(name));
+  const healthy = order.filter((name) => !isCoolingDown(name));
+  const allowed = (healthy.length > 0 ? healthy : order).filter(
+    (name) => !budgetBlocked(name),
+  );
   const tryOrder = allowed.length > 0 ? allowed : order;
 
   let response: ChatResponse | undefined;
@@ -141,6 +147,10 @@ export async function runChat(
     } catch (error) {
       failures.push(
         `${providerLabel(name)}: ${truncate(redactString(errorMessage(error)), 220)}`,
+      );
+      markProviderFailure(
+        name,
+        error instanceof ProviderError ? error.status : undefined,
       );
       logger.warn({ err: error, provider: name }, "Provider gagal, coba berikutnya");
     }

@@ -13,6 +13,8 @@ import { errorMessage } from "../util/errors.js";
 import { logger } from "../util/logger.js";
 import { truncate } from "../util/text.js";
 import { hasBudget, record, seedUsage } from "../usage.js";
+import { isCoolingDown, markProviderFailure } from "../cooldown.js";
+import { ProviderError } from "../util/errors.js";
 import { safeTyping, sendLong } from "../chat.js";
 
 function section(
@@ -65,12 +67,17 @@ export function registerBanding(bot: Bot): void {
     };
 
     const skipped: ProviderName[] = [];
+    const cooling: ProviderName[] = [];
     const tasks: Array<{
       name: ProviderName;
       promise: Promise<ChatResponse>;
     }> = [];
 
     for (const name of pair) {
+      if (isCoolingDown(name)) {
+        cooling.push(name);
+        continue;
+      }
       if (name === "grok" && !hasBudget()) {
         skipped.push(name);
         continue;
@@ -79,7 +86,9 @@ export function registerBanding(bot: Bot): void {
     }
 
     if (tasks.length === 0) {
-      await ctx.reply("⚠️ Budget harian habis dan tidak ada provider yang bisa dipakai.");
+      await ctx.reply(
+        "⚠️ Tidak ada provider yang bisa dipakai sekarang (budget habis / provider cooldown).",
+      );
       return;
     }
 
@@ -123,12 +132,24 @@ export function registerBanding(bot: Bot): void {
           `${PROVIDER_EMOJI[task.name]} ${providerLabel(task.name).toUpperCase()}\n❌ gagal: ${errorMessage(result.reason)}`,
           "",
         );
+        markProviderFailure(
+          task.name,
+          result.reason instanceof ProviderError
+            ? result.reason.status
+            : undefined,
+        );
         logger.warn(
           { err: result.reason, provider: task.name },
           "Banding: salah satu provider gagal",
         );
       }
     });
+
+    if (cooling.length > 0) {
+      blocks.push(
+        `⚠️ ${cooling.map((name) => providerLabel(name)).join(", ")} dilewati karena sedang cooldown (error sebelumnya).`,
+      );
+    }
 
     if (skipped.length > 0) {
       blocks.push(
