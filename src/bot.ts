@@ -72,6 +72,14 @@ healthServer.listen(config.port, () => {
   logger.info({ port: config.port }, "Health server listening");
 });
 
+healthServer.on("error", (error) => {
+  logger.error(
+    { err: error, port: config.port },
+    "Health server gagal listen — port dipakai proses lain? Set HEALTH_PORT ke port lain.",
+  );
+  process.exit(1);
+});
+
 let shuttingDown = false;
 
 async function shutdown(signal: string): Promise<void> {

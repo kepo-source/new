@@ -152,7 +152,9 @@ export const config = {
     const raw = Number(optional("DAILY_BUDGET_USD", "1"));
     return Number.isFinite(raw) ? Math.max(0, raw) : 1;
   })(),
-  port: Number(process.env.PORT ?? 8080),
+  // HEALTH_PORT menang atas PORT supaya environment lokal yang sudah punya
+  // PORT (mis. sandbox/IDE) tidak bentrok. Di Railway, PORT tetap dipakai.
+  port: Number(optional("HEALTH_PORT") || process.env.PORT || 8080),
   logLevel: optional("LOG_LEVEL", "info"),
   timezone: optional("TZ", "Asia/Jakarta"),
 } as const;

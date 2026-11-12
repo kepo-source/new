@@ -210,6 +210,7 @@ git push -u origin main
 | `TZ` | – | `Asia/Jakarta` | Timezone untuk tanggal & reset budget |
 | `LOG_LEVEL` | – | `info` | `debug` / `info` / `warn` / `error` |
 | `PORT` | – | `8080` | Diisi otomatis oleh Railway |
+| `HEALTH_PORT` | – | – | Opsional; menang atas `PORT`. Berguna kalau environment lokal sudah memakai `PORT` untuk hal lain (jangan diisi di Railway) |
 
 > Minimal satu dari `GEMINI_API_KEY` / `XAI_API_KEY` / `GROQ_API_KEY` harus diisi, kalau tidak bot menolak start dengan pesan jelas.
 
