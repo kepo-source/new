@@ -73,6 +73,8 @@ npm install
 cp .env.example .env
 ```
 
+> ⚠️ Isi key di **`.env`**, bukan di `.env.example`. `.env` sudah di-gitignore; `.env.example` cuma template dan ikut ke-commit.
+
 Isi `.env` minimal:
 
 ```env
@@ -206,7 +208,9 @@ Default routing sengaja "Gemini dulu" karena jauh lebih murah. Grok hanya kepaka
 | `Missing env var` | `.env` belum lengkap / Variables Railway belum diisi |
 | Bot diam saja | Chat ID belum masuk `ALLOWED_CHAT_IDS`, atau bot lain sedang polling dengan token sama |
 | `409 Conflict` | Ada dua instance bot jalan dengan token sama |
-| `Gemini HTTP 404` | Nama model salah / tidak tersedia untuk key lo |
+| `Gemini HTTP 401` / `API key not valid` | Key dari AI Studio yang berawalan `AQ.` sedang bermasalah di sisi Google. Regenerate key sampai dapat format `AIza...`, lalu hapus spasi/kutip di `.env` |
+| `Grok HTTP 400` / `Incorrect API key` | Pastikan itu key **xAI** (`xai-...`) dari console.x.ai, bukan key **Groq Cloud** (`gsk_...`) dari console.groq.com |
+| `Grok HTTP 404 model not found` | Ganti `GROK_MODEL` sesuai model yang tersedia di akun xAI lo |
 | `Grok HTTP 401` | `XAI_API_KEY` salah atau bukan key xAI |
 | `Sheets ... permission` | Spreadsheet belum di-share ke email service account (role Editor) |
 | `Sheets ... parse range` | Tab `messages` belum ada — bot harus jalan sekali dengan akses Sheets yang benar |

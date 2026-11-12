@@ -106,9 +106,30 @@ export async function initSheets(): Promise<void> {
   }
 
   try {
-    const credentials = JSON.parse(
-      Buffer.from(config.sheets.serviceAccountB64, "base64").toString("utf8"),
-    ) as Record<string, unknown>;
+    const decoded = Buffer.from(
+      config.sheets.serviceAccountB64,
+      "base64",
+    )
+      .toString("utf8")
+      .trim();
+
+    if (!decoded.startsWith("{")) {
+      throw new Error(
+        "GOOGLE_SA_B64 bukan JSON base64 yang valid. Isi dengan hasil `base64 -w0 service-account.json`.",
+      );
+    }
+
+    const credentials = JSON.parse(decoded) as {
+      client_email?: string;
+      private_key?: string;
+      [key: string]: unknown;
+    };
+
+    if (!credentials.client_email || !credentials.private_key) {
+      throw new Error(
+        "Service account JSON tidak punya client_email/private_key. Pastikan file key yang di-download benar.",
+      );
+    }
 
     const auth = new google.auth.GoogleAuth({
       credentials,
@@ -133,6 +154,10 @@ export async function initSheets(): Promise<void> {
       "Gagal init Google Sheets — cek GOOGLE_SA_B64 dan akses spreadsheet",
     );
   }
+}
+
+export function sheetsReady(): boolean {
+  return api !== null;
 }
 
 export function logExchange(exchange: ExchangeLog): void {

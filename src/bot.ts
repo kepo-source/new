@@ -5,7 +5,7 @@ import { registerAdmin } from "./commands/admin.js";
 import { registerAsk } from "./commands/ask.js";
 import { registerBanding } from "./commands/banding.js";
 import { registerStats } from "./commands/stats.js";
-import { closeSheets, initSheets } from "./sheets.js";
+import { closeSheets, initSheets, sheetsReady } from "./sheets.js";
 import { logger } from "./util/logger.js";
 import { seedUsage } from "./usage.js";
 
@@ -95,6 +95,19 @@ async function shutdown(signal: string): Promise<void> {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
+// === Peringatan konfigurasi yang sering bikin bingung ===
+if (config.gemini.apiKey.startsWith("AQ.")) {
+  logger.warn(
+    "GEMINI_API_KEY berawalan 'AQ.' — format baru AI Studio yang sering ditolak Gemini API. Regenerate sampai dapat key 'AIza...'.",
+  );
+}
+
+if (config.grok.apiKey.startsWith("gsk_")) {
+  logger.warn(
+    "XAI_API_KEY kelihatan seperti key Groq Cloud ('gsk_...'), bukan xAI ('xai-...'). Grok butuh key dari console.x.ai.",
+  );
+}
+
 // === Bootstrap ===
 await initSheets();
 await seedUsage();
@@ -121,7 +134,7 @@ bot.start({
       {
         bot: info.username,
         allowedChatIds: config.allowedChatIds.size,
-        sheets: Boolean(config.sheets.spreadsheetId),
+        sheets: sheetsReady(),
         budgetUsd: config.budgetUsd,
       },
       "Bot jalan",

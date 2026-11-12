@@ -2,7 +2,7 @@ import "dotenv/config";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) {
+  if (!value || value === "..." || value === "-") {
     throw new Error(
       `Env var ${name} belum diisi. Salin .env.example menjadi .env lalu lengkapi.`,
     );
@@ -10,8 +10,26 @@ function required(name: string): string {
   return value;
 }
 
+function telegramToken(): string {
+  const token = required("TELEGRAM_BOT_TOKEN");
+  if (!/^\d+:[A-Za-z0-9_-]{35}$/.test(token)) {
+    throw new Error(
+      "TELEGRAM_BOT_TOKEN formatnya tidak valid. Harus seperti 123456789:AAH... (35 karakter setelah titik dua).",
+    );
+  }
+  return token;
+}
+
 function optional(name: string, fallback = ""): string {
-  return process.env[name]?.trim() || fallback;
+  const value = process.env[name]?.trim();
+  if (!value || value === "..." || value === "-") return fallback;
+  return value;
+}
+
+/** Terima ID spreadsheet mentah maupun URL lengkap. */
+function normalizeSheetId(raw: string): string {
+  const match = raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return match?.[1] ?? raw;
 }
 
 function parseChatIds(raw: string): Set<number> {
@@ -30,7 +48,7 @@ function parseChatIds(raw: string): Set<number> {
 }
 
 export const config = {
-  telegramToken: required("TELEGRAM_BOT_TOKEN"),
+  telegramToken: telegramToken(),
   allowedChatIds: parseChatIds(optional("ALLOWED_CHAT_IDS")),
   gemini: {
     apiKey: required("GEMINI_API_KEY"),
@@ -42,7 +60,7 @@ export const config = {
     baseUrl: optional("XAI_BASE_URL", "https://api.x.ai/v1").replace(/\/$/, ""),
   },
   sheets: {
-    spreadsheetId: optional("GOOGLE_SHEETS_ID"),
+    spreadsheetId: normalizeSheetId(optional("GOOGLE_SHEETS_ID")),
     serviceAccountB64: optional("GOOGLE_SA_B64"),
   },
   budgetUsd: Math.max(0, Number(optional("DAILY_BUDGET_USD", "1")) || 1),
