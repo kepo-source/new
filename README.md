@@ -182,9 +182,10 @@ git push -u origin main
    - `GOOGLE_SHEETS_ID`, `GOOGLE_SA_B64`
    - `DAILY_BUDGET_USD`, `TZ`, `LOG_LEVEL`
 4. Railway otomatis build pakai `railway.json` dan start `npm start`.
-5. Cek **Deployments → Logs**: harus muncul `Bot jalan`.
-6. Buka domain Railway + `/health` → `{"ok":true,...}`.
-7. Kirim `/ping` ke bot.
+5. Di Railway, generate domain publik (Settings → Networking → Generate Domain). Bot otomatis pakai **webhook** karena `RAILWAY_PUBLIC_DOMAIN` tersedia, jadi tidak ada lagi error `409 Conflict` dari polling ganda. Set `TELEGRAM_MODE=polling` kalau memang mau long polling.
+6. Cek **Deployments → Logs**: harus muncul `Bot jalan` dengan `mode: "webhook"`.
+7. Buka domain Railway + `/health` → `{"ok":true,"mode":"webhook",...}`.
+8. Kirim `/ping` ke bot.
 
 > Railway tidak punya free tier permanen. Plan Hobby (±$5/bulan) sudah lebih dari cukup untuk bot ini.
 >
@@ -196,6 +197,10 @@ git push -u origin main
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | ✅ | – | Token dari BotFather |
 | `ALLOWED_CHAT_IDS` | ✅ | – | Pisahkan dengan koma |
+| `TELEGRAM_MODE` | – | `auto` | `auto` = webhook kalau ada domain publik, kalau tidak polling |
+| `PUBLIC_DOMAIN` | – | `RAILWAY_PUBLIC_DOMAIN` | Domain webhook (tanpa `https://`) |
+| `TELEGRAM_WEBHOOK_SECRET` | – | turunan token | Secret header webhook, opsional |
+| `TELEGRAM_WEBHOOK_PATH` | – | `/telegram` | Prefix path webhook |
 | `GEMINI_API_KEY` | – | – | API key Google AI Studio (`AIza...`) |
 | `GEMINI_MODEL` | – | `gemini-2.5-flash` | Ganti kalau mau model lain |
 | `XAI_API_KEY` | – | – | API key xAI (`xai-...`) untuk Grok |

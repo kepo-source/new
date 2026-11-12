@@ -1,4 +1,5 @@
-import { createServer } from "node:http";
+import { createHash } from "node:crypto";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Bot } from "grammy";
 import { config, configWarnings } from "./config.js";
 import { availableProviders, getProvider } from "./providers/index.js";
@@ -11,6 +12,28 @@ import { logger } from "./util/logger.js";
 import { seedUsage } from "./usage.js";
 
 const bot = new Bot(config.telegramToken);
+
+// === Mode koneksi: webhook (produksi) atau long polling (lokal) ===
+const webhookSecret =
+  config.telegram.webhookSecret ||
+  createHash("sha256")
+    .update(`${config.telegramToken}:webhook`)
+    .digest("hex")
+    .slice(0, 40);
+
+const useWebhook =
+  config.telegram.mode === "webhook" ||
+  (config.telegram.mode !== "polling" && Boolean(config.telegram.publicDomain));
+
+const webhookPath = `${config.telegram.webhookPath.replace(/\/$/, "")}/${webhookSecret}`;
+const publicDomain = config.telegram.publicDomain;
+const webhookUrl = publicDomain ? `https://${publicDomain}${webhookPath}` : "";
+
+if (config.telegram.mode === "webhook" && !webhookUrl) {
+  throw new Error(
+    "TELEGRAM_MODE=webhook butuh PUBLIC_DOMAIN atau RAILWAY_PUBLIC_DOMAIN.",
+  );
+}
 
 // === Auth guard: hanya chat ID yang di-whitelist ===
 bot.use(async (ctx, next) => {
@@ -45,14 +68,49 @@ bot.catch(async (error) => {
   }
 });
 
-// === Health server (dipakai Railway healthcheck) ===
+// === Health server + endpoint webhook Telegram ===
+async function handleWebhook(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const provided = request.headers["x-telegram-bot-api-secret-token"];
+  if (provided !== webhookSecret) {
+    response.writeHead(401, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+    return;
+  }
+
+  try {
+    let raw = "";
+    for await (const chunk of request) {
+      raw += chunk;
+      if (raw.length > 1_000_000) throw new Error("body terlalu besar");
+    }
+    const update = JSON.parse(raw);
+    await bot.handleUpdate(update);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
+  } catch (error) {
+    // Selalu balas 200 supaya Telegram tidak mengirim ulang terus-menerus.
+    logger.error({ err: error }, "Webhook gagal memproses update");
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
+  }
+}
+
 const healthServer = createServer((request, response) => {
+  if (useWebhook && request.method === "POST" && request.url === webhookPath) {
+    void handleWebhook(request, response);
+    return;
+  }
+
   if (request.url === "/health" || request.url === "/") {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(
       JSON.stringify({
         ok: true,
         uptimeSec: Math.round(process.uptime()),
+        mode: useWebhook ? "webhook" : "polling",
         providers: availableProviders.map((name) => ({
           name,
           model: getProvider(name).model,
@@ -180,4 +238,26 @@ async function startBot(attempt = 1): Promise<void> {
   }
 }
 
-void startBot();
+if (useWebhook) {
+  await bot.init();
+  await bot.api.setWebhook(webhookUrl, {
+    secret_token: webhookSecret,
+    drop_pending_updates: true,
+  });
+  logger.info(
+    {
+      bot: bot.botInfo.username,
+      allowedChatIds: config.allowedChatIds.size,
+      sheets: sheetsReady(),
+      providers: availableProviders,
+      defaultProvider: config.defaultProvider,
+      deepProvider: config.deepProvider,
+      budgetUsd: config.budgetUsd,
+      mode: "webhook",
+      path: `${config.telegram.webhookPath}/***`,
+    },
+    "Bot jalan",
+  );
+} else {
+  void startBot();
+}

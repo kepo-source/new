@@ -157,6 +157,12 @@ export const config = {
   port: Number(optional("HEALTH_PORT") || process.env.PORT || 8080),
   logLevel: optional("LOG_LEVEL", "info"),
   timezone: optional("TZ", "Asia/Jakarta"),
+  telegram: {
+    mode: optional("TELEGRAM_MODE", "auto").toLowerCase(),
+    publicDomain: optional("PUBLIC_DOMAIN") || optional("RAILWAY_PUBLIC_DOMAIN"),
+    webhookSecret: optional("TELEGRAM_WEBHOOK_SECRET"),
+    webhookPath: optional("TELEGRAM_WEBHOOK_PATH", "/telegram"),
+  },
 } as const;
 
 export { configWarnings };
