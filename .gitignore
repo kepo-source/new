@@ -8,3 +8,4 @@ dist/
 coverage/
 *.pem
 *.json.key
+*service-account*.json

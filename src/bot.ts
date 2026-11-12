@@ -131,19 +131,48 @@ try {
   logger.warn({ err: error }, "Gagal set command menu");
 }
 
-bot.start({
-  onStart: (info) => {
-    logger.info(
-      {
-        bot: info.username,
-        allowedChatIds: config.allowedChatIds.size,
-        sheets: sheetsReady(),
-        providers: availableProviders,
-        defaultProvider: config.defaultProvider,
-        deepProvider: config.deepProvider,
-        budgetUsd: config.budgetUsd,
+const MAX_START_ATTEMPTS = 8;
+
+function isRetryableStartError(error: unknown): boolean {
+  const message = (error as Error)?.message ?? String(error);
+  return /409|Conflict|terminated by other getUpdates|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|ECONNRESET/i.test(
+    message,
+  );
+}
+
+async function startBot(attempt = 1): Promise<void> {
+  try {
+    await bot.start({
+      onStart: (info) => {
+        logger.info(
+          {
+            bot: info.username,
+            allowedChatIds: config.allowedChatIds.size,
+            sheets: sheetsReady(),
+            providers: availableProviders,
+            defaultProvider: config.defaultProvider,
+            deepProvider: config.deepProvider,
+            budgetUsd: config.budgetUsd,
+          },
+          "Bot jalan",
+        );
       },
-      "Bot jalan",
-    );
-  },
-});
+    });
+  } catch (error) {
+    logger.error({ err: error, attempt }, "Bot berhenti");
+
+    if (attempt < MAX_START_ATTEMPTS && isRetryableStartError(error)) {
+      const delayMs = Math.min(60_000, 5_000 * attempt);
+      logger.warn(
+        { attempt, delayMs },
+        "Error sementara (409/jaringan) — coba start ulang",
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return startBot(attempt + 1);
+    }
+
+    process.exit(1);
+  }
+}
+
+void startBot();
