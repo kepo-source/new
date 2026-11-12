@@ -2,7 +2,7 @@
   "name": "second-brain",
   "version": "0.1.0",
   "private": true,
-  "description": "Telegram second brain dengan multi-model router (Gemini + Grok) dan logging Google Sheets",
+  "description": "Telegram second brain dengan multi-provider LLM (Groq/Gemini/xAI) dan logging Google Sheets",
   "type": "module",
   "engines": {
     "node": "22.x"
@@ -12,7 +12,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/bot.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "chatid": "tsx scripts/chat-id.ts"
+    "chatid": "tsx scripts/chat-id.ts",
+    "setup:sheets": "tsx scripts/setup-sheets.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

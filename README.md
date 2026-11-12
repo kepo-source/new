@@ -140,7 +140,16 @@ PowerShell:
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("service-account.json"))
 ```
 
-8. Isi `.env`:
+8. Masukkan otomatis lewat script (validasi + tulis `.env` + cek akses):
+
+```bash
+npm run setup:sheets -- --file ./service-account.json \
+  --sheet "https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit"
+```
+
+Script akan mencetak `client_email` kalau spreadsheet belum di-share, jadi lo bisa langsung invite.
+
+Kalau mau isi manual:
 
 ```env
 GOOGLE_SHEETS_ID=...
