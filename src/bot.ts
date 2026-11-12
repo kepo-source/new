@@ -159,9 +159,14 @@ async function startBot(attempt = 1): Promise<void> {
       },
     });
   } catch (error) {
-    logger.error({ err: error, attempt }, "Bot berhenti");
+    const message = (error as Error)?.message ?? String(error);
+    const name = (error as Error)?.name ?? "Error";
+    logger.error(
+      { err: error, attempt },
+      `Bot berhenti: ${name}: ${message.slice(0, 300)}`,
+    );
 
-    if (attempt < MAX_START_ATTEMPTS && isRetryableStartError(error)) {
+    if (isRetryableStartError(error) || attempt < MAX_START_ATTEMPTS) {
       const delayMs = Math.min(60_000, 5_000 * attempt);
       logger.warn(
         { attempt, delayMs },
