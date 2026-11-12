@@ -242,7 +242,7 @@ if (useWebhook) {
   await bot.init();
   await bot.api.setWebhook(webhookUrl, {
     secret_token: webhookSecret,
-    drop_pending_updates: true,
+    drop_pending_updates: false,
   });
   logger.info(
     {
