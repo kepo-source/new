@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { Bot } from "grammy";
 import { config, configWarnings } from "./config.js";
-import { availableProviders } from "./providers/index.js";
+import { availableProviders, getProvider } from "./providers/index.js";
 import { registerAdmin } from "./commands/admin.js";
 import { registerAsk } from "./commands/ask.js";
 import { registerBanding } from "./commands/banding.js";
@@ -53,10 +53,12 @@ const healthServer = createServer((request, response) => {
       JSON.stringify({
         ok: true,
         uptimeSec: Math.round(process.uptime()),
-        models: {
-          gemini: config.gemini.model,
-          grok: config.grok.model,
-        },
+        providers: availableProviders.map((name) => ({
+          name,
+          model: getProvider(name).model,
+          default: name === config.defaultProvider,
+          deep: name === config.deepProvider,
+        })),
       }),
     );
     return;
