@@ -1,4 +1,4 @@
-export type ProviderName = "gemini" | "grok" | "groq";
+export type ProviderName = "gemini" | "groq";
 
 export type Role = "user" | "assistant";
 

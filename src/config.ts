@@ -54,32 +54,19 @@ function normalizeBaseUrl(raw: string, fallback: string): string {
 
 // === Provider LLM ===
 const geminiKey = optional("GEMINI_API_KEY");
-const xaiRaw = optional("XAI_API_KEY");
-const groqRaw = optional("GROQ_API_KEY");
-
-// Toleransi umum: key Groq (gsk_...) tidak sengaja ditaruh di XAI_API_KEY.
-const xaiKeyIsGroq = xaiRaw.startsWith("gsk_");
-const xaiKey = xaiKeyIsGroq ? "" : xaiRaw;
-const groqKey = groqRaw || (xaiKeyIsGroq ? xaiRaw : "");
+const groqKey = optional("GROQ_API_KEY");
 
 const availableProviders: ProviderName[] = [];
 if (geminiKey) availableProviders.push("gemini");
-if (xaiKey) availableProviders.push("grok");
 if (groqKey) availableProviders.push("groq");
 
 if (availableProviders.length === 0) {
   throw new Error(
-    "Minimal satu provider LLM harus diisi: GEMINI_API_KEY, XAI_API_KEY, atau GROQ_API_KEY.",
+    "Minimal satu provider LLM harus diisi: GEMINI_API_KEY atau GROQ_API_KEY.",
   );
 }
 
 const configWarnings: string[] = [];
-
-if (xaiKeyIsGroq) {
-  configWarnings.push(
-    "XAI_API_KEY berisi key Groq (gsk_...). Otomatis dipakai sebagai provider Groq, bukan xAI.",
-  );
-}
 
 export type GeminiThinkingLevel =
   | "minimal"
@@ -132,14 +119,9 @@ function resolveProvider(
 const defaultProvider = resolveProvider("DEFAULT_PROVIDER", [
   "gemini",
   "groq",
-  "grok",
 ]);
 
-const deepProvider = resolveProvider("DEEP_PROVIDER", [
-  "grok",
-  "groq",
-  "gemini",
-]);
+const deepProvider = resolveProvider("DEEP_PROVIDER", ["gemini", "groq"]);
 
 export const config = {
   telegramToken: telegramToken(),
@@ -151,11 +133,6 @@ export const config = {
     apiKey: geminiKey,
     model: optional("GEMINI_MODEL", "gemini-3.5-flash-lite"),
     thinkingLevel: geminiThinkingLevel(),
-  },
-  grok: {
-    apiKey: xaiKey,
-    model: optional("GROK_MODEL", "grok-4"),
-    baseUrl: normalizeBaseUrl(optional("XAI_BASE_URL"), "https://api.x.ai/v1"),
   },
   groq: {
     apiKey: groqKey,

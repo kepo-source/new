@@ -2,7 +2,7 @@
   "name": "second-brain",
   "version": "0.1.0",
   "private": true,
-  "description": "Telegram second brain dengan multi-provider LLM (Groq/Gemini/xAI) dan logging Google Sheets",
+  "description": "Telegram second brain dengan multi-provider LLM (Gemini/Groq) dan logging Google Sheets",
   "type": "module",
   "engines": {
     "node": "22.x"

@@ -3,6 +3,7 @@ import { SYSTEM_PROMPT, config } from "../config.js";
 import { appendAssistant, appendUser, getHistory } from "../memory.js";
 import {
   PROVIDER_EMOJI,
+  availableProviders,
   getProvider,
   providerLabel,
 } from "../providers/index.js";
@@ -12,7 +13,7 @@ import { estimateCost, formatUsd } from "../util/cost.js";
 import { errorMessage } from "../util/errors.js";
 import { logger } from "../util/logger.js";
 import { truncate } from "../util/text.js";
-import { hasBudget, record, seedUsage } from "../usage.js";
+import { record, seedUsage } from "../usage.js";
 import { isCoolingDown, markProviderFailure } from "../cooldown.js";
 import { ProviderError } from "../util/errors.js";
 import { safeTyping, sendLong } from "../chat.js";
@@ -43,14 +44,21 @@ export function registerBanding(bot: Bot): void {
       return;
     }
 
-    const pair: ProviderName[] = [config.defaultProvider];
-    if (config.deepProvider !== config.defaultProvider) {
-      pair.push(config.deepProvider);
+    const pair: ProviderName[] = [];
+    for (const name of [
+      config.defaultProvider,
+      config.deepProvider,
+      ...availableProviders,
+    ]) {
+      if (!pair.includes(name) && availableProviders.includes(name)) {
+        pair.push(name);
+      }
+      if (pair.length === 2) break;
     }
 
     if (pair.length < 2) {
       await ctx.reply(
-        `🆚 /banding butuh dua provider berbeda.\nSekarang cuma aktif: ${providerLabel(config.defaultProvider)} (${getProvider(config.defaultProvider).model}).\n\nTambah key provider kedua (Gemini/xAI) kalau mau fitur banding.`,
+        `🆚 /banding butuh dua provider berbeda.\nSekarang cuma aktif: ${providerLabel(config.defaultProvider)} (${getProvider(config.defaultProvider).model}).\n\nTambah key provider kedua (Gemini/Groq) kalau mau fitur banding.`,
       );
       return;
     }
@@ -66,7 +74,6 @@ export function registerBanding(bot: Bot): void {
       system: SYSTEM_PROMPT,
     };
 
-    const skipped: ProviderName[] = [];
     const cooling: ProviderName[] = [];
     const tasks: Array<{
       name: ProviderName;
@@ -78,16 +85,12 @@ export function registerBanding(bot: Bot): void {
         cooling.push(name);
         continue;
       }
-      if (name === "grok" && !hasBudget()) {
-        skipped.push(name);
-        continue;
-      }
       tasks.push({ name, promise: getProvider(name).chat(request) });
     }
 
     if (tasks.length === 0) {
       await ctx.reply(
-        "⚠️ Tidak ada provider yang bisa dipakai sekarang (budget habis / provider cooldown).",
+        "⚠️ Tidak ada provider yang bisa dipakai sekarang (provider cooldown).",
       );
       return;
     }
@@ -148,12 +151,6 @@ export function registerBanding(bot: Bot): void {
     if (cooling.length > 0) {
       blocks.push(
         `⚠️ ${cooling.map((name) => providerLabel(name)).join(", ")} dilewati karena sedang cooldown (error sebelumnya).`,
-      );
-    }
-
-    if (skipped.length > 0) {
-      blocks.push(
-        `⚠️ ${skipped.map((name) => providerLabel(name)).join(", ")} dilewati karena budget harian habis.`,
       );
     }
 

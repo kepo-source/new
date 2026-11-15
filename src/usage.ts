@@ -65,11 +65,6 @@ export function record(
   byModel.set(model, current);
 }
 
-export function hasBudget(): boolean {
-  rollover();
-  return totals.cost < config.budgetUsd;
-}
-
 export function budgetRemaining(): number {
   rollover();
   return Math.max(0, config.budgetUsd - totals.cost);

@@ -14,19 +14,14 @@ import { errorMessage } from "./util/errors.js";
 import { logger } from "./util/logger.js";
 import { redactString } from "./util/redact.js";
 import { chunkText, truncate } from "./util/text.js";
-import { hasBudget, record, seedUsage } from "./usage.js";
+import { record, seedUsage } from "./usage.js";
 import { isCoolingDown, markProviderFailure } from "./cooldown.js";
 import { ProviderError } from "./util/errors.js";
 
 const MAX_PROMPT_CHARS = 6000;
 
-/** Urutan fallback: murah dan umum dulu. */
-const PREFERENCE: ProviderName[] = ["gemini", "groq", "grok"];
-
-/** Budget harian hanya menahan provider mahal (Grok xAI). */
-function budgetBlocked(name: ProviderName): boolean {
-  return name === "grok" && !hasBudget();
-}
+/** Urutan fallback: Gemini dulu (cepat & murah), lalu Groq. */
+const PREFERENCE: ProviderName[] = ["gemini", "groq"];
 
 function buildOrder(primary: ProviderName): ProviderName[] {
   return [
@@ -103,21 +98,6 @@ export async function runChat(
   let primaryName: ProviderName = decision.provider;
   let note = "";
 
-  if (budgetBlocked(primaryName)) {
-    const alternative = buildOrder(primaryName).find(
-      (name) =>
-        !budgetBlocked(name) && name !== primaryName && !isCoolingDown(name),
-    );
-
-    if (alternative) {
-      note = `⚠️ Budget harian habis, request dialihkan ke ${providerLabel(alternative)}.\n\n`;
-      primaryName = alternative;
-    } else {
-      note =
-        "⚠️ Budget harian sudah lewat, tapi Grok satu-satunya provider aktif.\n\n";
-    }
-  }
-
   const request = {
     messages: [
       ...getHistory(chatId),
@@ -130,10 +110,7 @@ export async function runChat(
 
   const order = buildOrder(primaryName);
   const healthy = order.filter((name) => !isCoolingDown(name));
-  const allowed = (healthy.length > 0 ? healthy : order).filter(
-    (name) => !budgetBlocked(name),
-  );
-  const tryOrder = allowed.length > 0 ? allowed : order;
+  const tryOrder = healthy.length > 0 ? healthy : order;
 
   let response: ChatResponse | undefined;
   let usedName: ProviderName = primaryName;
