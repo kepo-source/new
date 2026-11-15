@@ -71,7 +71,7 @@ scripts/chat-id.ts      # bantu ambil chat ID
 - Node.js **22** (sesuai `engines` di package.json)
 - Bot Telegram dari [@BotFather](https://t.me/BotFather)
 - API key **Groq** dari [console.groq.com](https://console.groq.com) — cukup ini saja
-- _(opsional)_ API key Gemini / xAI kalau mau fallback multi-provider
+- _(opsional)_ API key Gemini / xAI kalau mau fallback multi-provider (key AI Studio sekarang berformat `AQ.…`)
 - Google Cloud project + **service account** dengan Sheets API aktif (opsional, buat logging)
 
 ## 2. Setup lokal
@@ -175,7 +175,7 @@ git push -u origin main
 3. Tab **Variables**, copy semua isi `.env` (tanpa tanda kutip):
    - `TELEGRAM_BOT_TOKEN`
    - `ALLOWED_CHAT_IDS`
-   - `GEMINI_API_KEY`, `GEMINI_MODEL`
+   - `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL`
    - `XAI_API_KEY`, `GROK_MODEL`
    - `GROQ_API_KEY`, `GROQ_MODEL`
    - `DEFAULT_PROVIDER`, `DEEP_PROVIDER`
@@ -201,8 +201,9 @@ git push -u origin main
 | `PUBLIC_DOMAIN` | – | `RAILWAY_PUBLIC_DOMAIN` | Domain webhook (tanpa `https://`) |
 | `TELEGRAM_WEBHOOK_SECRET` | – | turunan token | Secret header webhook, opsional |
 | `TELEGRAM_WEBHOOK_PATH` | – | `/telegram` | Prefix path webhook |
-| `GEMINI_API_KEY` | – | – | API key Google AI Studio (`AIza...`) |
-| `GEMINI_MODEL` | – | `gemini-2.5-flash` | Ganti kalau mau model lain |
+| `GEMINI_API_KEY` | – | – | API key Google AI Studio (format sekarang `AQ.…`; key lama `AIza…` hanya jalan kalau masih aktif) |
+| `GEMINI_MODEL` | – | `gemini-3.5-flash-lite` | Model Gemini yang dipakai (paling cepat). `gemini-4-hydrogen` = lebih detail tapi lebih lambat |
+| `GEMINI_THINKING_LEVEL` | – | `low` | `minimal` / `low` / `medium` / `high` / `xhigh`. `low` = paling cepat; Gemini 4 tidak mendukung `minimal` |
 | `XAI_API_KEY` | – | – | API key xAI (`xai-...`) untuk Grok |
 | `GROK_MODEL` | – | `grok-4` | Sesuaikan dengan model xAI yang tersedia |
 | `XAI_BASE_URL` | – | `https://api.x.ai/v1` | Biasanya tidak perlu diubah |
@@ -225,6 +226,8 @@ git push -u origin main
 
 Cukup ubah env `GEMINI_MODEL` / `GROK_MODEL` / `GROQ_MODEL`, restart. Kalau nama model salah, provider akan error dan bot kasih tahu di chat/log.
 
+Khusus Gemini, `GEMINI_THINKING_LEVEL` mengatur seberapa dalam model "berpikir" sebelum menjawab. Default `low` (paling cepat, tetap cukup detail). Naikkan ke `medium`/`high` kalau butuh jawaban lebih mendalam, atau turunkan ke `minimal` untuk model flash-lite kalau mau paling ngebut. Default `gemini-3.5-flash-lite` dipilih karena paling cepat (≈1 detik di testing); kalau butuh jawaban lebih dalam dan tidak masalah lebih lambat, pakai `GEMINI_MODEL=gemini-4-hydrogen`.
+
 ### Ubah aturan routing
 
 Edit `src/router.ts`, bagian `DEEP_PATTERNS`. Keyword yang match akan diarahkan ke `DEEP_PROVIDER`; sisanya `DEFAULT_PROVIDER`.
@@ -244,7 +247,7 @@ Budget hanya menahan **Grok xAI** (provider termahal) dan tidak berpengaruh sela
 | `Missing env var` | `.env` belum lengkap / Variables Railway belum diisi |
 | Bot diam saja | Chat ID belum masuk `ALLOWED_CHAT_IDS`, atau bot lain sedang polling dengan token sama |
 | `409 Conflict` | Ada dua instance bot jalan dengan token sama |
-| `Gemini HTTP 401` / `API key not valid` | Key dari AI Studio yang berawalan `AQ.` sedang bermasalah di sisi Google. Regenerate key sampai dapat format `AIza...`, lalu hapus spasi/kutip di `.env` |
+| `Gemini HTTP 401` / `API key not valid` / `ACCESS_TOKEN_TYPE_UNSUPPORTED` | Key `AQ.…` belum aktif untuk Gemini API. Pastikan key dibuat di project yang sudah enable **Generative Language API** + billing, atau buat key baru di [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Kalau tetap gagal, itu masalah provisioning di sisi Google — pakai provider lain (Groq) sementara |
 | `Grok HTTP 400` / `Incorrect API key` | Pastikan itu key **xAI** (`xai-...`) dari console.x.ai, bukan key **Groq Cloud** (`gsk_...`) dari console.groq.com |
 | `Grok HTTP 404 model not found` | Ganti `GROK_MODEL` sesuai model yang tersedia di akun xAI lo |
 | `Grok HTTP 401` | `XAI_API_KEY` salah atau bukan key xAI |

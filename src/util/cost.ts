@@ -3,6 +3,8 @@
  * sesuaikan dengan halaman pricing masing-masing provider kalau perlu.
  */
 const PRICES: Record<string, { input: number; output: number }> = {
+  "gemini-4-hydrogen": { input: 1.5, output: 7.5 },
+  "gemini-3.5-flash-lite": { input: 0.3, output: 2.5 },
   "gemini-2.5-flash": { input: 0.3, output: 2.5 },
   "gemini-2.5-flash-lite": { input: 0.1, output: 0.4 },
   "gemini-2.5-pro": { input: 1.25, output: 10 },

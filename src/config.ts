@@ -81,10 +81,30 @@ if (xaiKeyIsGroq) {
   );
 }
 
-if (geminiKey.startsWith("AQ.")) {
+export type GeminiThinkingLevel =
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh";
+
+const GEMINI_THINKING_LEVELS: GeminiThinkingLevel[] = [
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+];
+
+function geminiThinkingLevel(): GeminiThinkingLevel {
+  const raw = optional("GEMINI_THINKING_LEVEL", "low").toLowerCase();
+  if ((GEMINI_THINKING_LEVELS as string[]).includes(raw)) {
+    return raw as GeminiThinkingLevel;
+  }
   configWarnings.push(
-    "GEMINI_API_KEY berawalan 'AQ.' — format baru AI Studio yang sering ditolak Gemini API. Regenerate sampai dapat key 'AIza...'.",
+    `GEMINI_THINKING_LEVEL=${raw} tidak dikenal. Pakai 'low'. Pilihan: ${GEMINI_THINKING_LEVELS.join(", ")}.`,
   );
+  return "low";
 }
 
 function resolveProvider(
@@ -129,7 +149,8 @@ export const config = {
   deepProvider,
   gemini: {
     apiKey: geminiKey,
-    model: optional("GEMINI_MODEL", "gemini-2.5-flash"),
+    model: optional("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+    thinkingLevel: geminiThinkingLevel(),
   },
   grok: {
     apiKey: xaiKey,
