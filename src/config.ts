@@ -52,6 +52,26 @@ function normalizeBaseUrl(raw: string, fallback: string): string {
   return (raw || fallback).replace(/\/$/, "");
 }
 
+function boolEnv(name: string, fallback: boolean): boolean {
+  const raw = optional(name).toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  configWarnings.push(`${name}=${raw} tidak dikenal. Pakai ${fallback}.`);
+  return fallback;
+}
+
+function positiveInt(name: string, fallback: number, min: number, max: number): number {
+  const raw = optional(name);
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    configWarnings.push(`${name}=${raw} bukan angka. Pakai ${fallback}.`);
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
 // === Provider LLM ===
 const geminiKey = optional("GEMINI_API_KEY");
 const groqKey = optional("GROQ_API_KEY");
@@ -174,6 +194,17 @@ export const config = {
     apiKey: xkiroKeyV3,
     model: optional("XKIRO_MODEL_V3", xkiroModel),
     baseUrl: normalizeBaseUrl(optional("XKIRO_BASE_URL_V3"), xkiroBaseUrl),
+  },
+  hermes: {
+    enabled: boolEnv("HERMES_ENABLED", true),
+    apiKey: optional("HERMES_API_KEY"),
+    binary: optional("HERMES_BIN"),
+    home: optional("HERMES_HOME") || `${process.env.HOME || "/app"}/.hermes`,
+    model: optional("HERMES_MODEL", xkiroModel),
+    baseUrl: normalizeBaseUrl(optional("HERMES_BASE_URL"), xkiroBaseUrl),
+    contextLength: positiveInt("HERMES_CONTEXT_LENGTH", 256_000, 64_000, 1_000_000),
+    timeoutMs: positiveInt("HERMES_TIMEOUT_MS", 180_000, 10_000, 600_000),
+    maxChars: positiveInt("HERMES_MAX_CHARS", 3_500, 500, 3_900),
   },
   sheets: {
     spreadsheetId: normalizeSheetId(optional("GOOGLE_SHEETS_ID")),

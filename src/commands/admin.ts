@@ -22,6 +22,7 @@ export function registerAdmin(bot: Bot): void {
         "/fast <teks> → model default (cepat/murah)",
         "/deep <teks> → model deep (analisa)",
         "/banding <teks> → dua model sekaligus",
+        "/hermes <tugas> → agent (tool mati) lewat xKiro",
         "/stats → pemakaian & biaya hari ini",
         "/budget → sisa budget",
         "/model → model aktif",
@@ -36,6 +37,7 @@ export function registerAdmin(bot: Bot): void {
       [
         "📖 Command:",
         "/ask /fast /deep /banding <teks>",
+        "/hermes <tugas> → Hermes Agent",
         "/stats /budget /model /reset",
         "",
         "Tip: kirim pesan biasa juga bisa — nanti otomatis dipilih modelnya.",

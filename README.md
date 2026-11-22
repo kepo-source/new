@@ -10,6 +10,8 @@ Defaultnya pakai **xKiro** dengan 3 key yang dipakai bergiliran. Kalau ketiganya
 
 Cukup punya satu key xKiro; key ke-2/ke-3 sangat disarankan biar bot nggak berhenti saat free tier kena rate limit. Gemini/Groq tetap bisa dipakai sebagai cadangan.
 
+Ada juga **Hermes Agent** (Nous Research) lewat command `/hermes <tugas>`. Agent-nya memakai endpoint xKiro yang sama, jadi tidak perlu key baru. Toolset sengaja dimatikan — agent cuma berpikir & menjawab, tidak menjalankan shell/file dari Telegram.
+
 ```
 Telegram ──▶ grammY (Node/TS)
                  │
@@ -30,6 +32,7 @@ Telegram ──▶ grammY (Node/TS)
 - Log lengkap ke Sheets: model, token, latency, biaya, alasan routing.
 - Budget harian sebagai laporan biaya (`/stats`, `/budget`); tidak membatasi provider.
 - `/stats` dan `/budget` buat pantau pemakaian.
+- `/hermes <tugas>` menjalankan Hermes Agent dengan key xKiro bergiliran (tool mati, aman buat Telegram).
 - Hanya chat ID yang di-whitelist yang bisa memakai bot.
 
 ## Command
@@ -41,6 +44,7 @@ Telegram ──▶ grammY (Node/TS)
 | `/fast <teks>` | Paksa model default |
 | `/deep <teks>` | Paksa model deep |
 | `/banding <teks>` | Dua provider aktif paralel (mis. xKiro vs xKiro 2) |
+| `/hermes <tugas>` | Hermes Agent via xKiro (tool dimatikan) |
 | `/stats` | Pemakaian & biaya hari ini |
 | `/budget` | Sisa budget harian |
 | `/model` | Model aktif |
@@ -54,12 +58,13 @@ src/
 ├── bot.ts              # entry: auth, command, health server, shutdown
 ├── config.ts           # env + system prompt
 ├── chat.ts             # orkestrasi chat + fallback + logging
+├── hermes.ts           # runner Hermes Agent (config + rotasi key xKiro)
 ├── router.ts           # heuristik pemilihan model
 ├── memory.ts           # konteks per chat
 ├── sheets.ts           # queue log ke Google Sheets
 ├── usage.ts            # budget & counter harian
 ├── providers/          # xkiro.ts (3 key), gemini.ts, groq.ts (+ openai-compatible base)
-├── commands/           # admin, ask, banding, stats
+├── commands/           # admin, ask, banding, hermes, stats
 └── util/               # logger, cost, date, text, errors
 scripts/chat-id.ts      # bantu ambil chat ID
 ```
@@ -188,9 +193,10 @@ git push -u origin main
    - `GROQ_API_KEY`, `GROQ_MODEL`
    - `XKIRO_API_KEY`, `XKIRO_API_KEY_V2`, `XKIRO_API_KEY_V3`, `XKIRO_MODEL`
    - `DEFAULT_PROVIDER`, `DEEP_PROVIDER`
+   - `HERMES_ENABLED`, `HERMES_MODEL` (opsional; default sudah memakai xKiro)
    - `GOOGLE_SHEETS_ID`, `GOOGLE_SA_B64`
    - `DAILY_BUDGET_USD`, `TZ`, `LOG_LEVEL`
-4. Railway otomatis build pakai `railway.json` dan start `npm start`.
+4. Railway otomatis build pakai `railway.json` + `railpack.json` dan start `npm start`. `railpack.json` juga meng-install Hermes Agent 0.19.0 ke `/app/.hermes-pkg` dan membuat wrapper `/app/.hermes-bin/hermes`, jadi `/hermes` langsung bisa dipakai.
 5. Di Railway, generate domain publik (Settings → Networking → Generate Domain). Bot otomatis pakai **webhook** karena `RAILWAY_PUBLIC_DOMAIN` tersedia, jadi tidak ada lagi error `409 Conflict` dari polling ganda. Set `TELEGRAM_MODE=polling` kalau memang mau long polling.
 6. Cek **Deployments → Logs**: harus muncul `Bot jalan` dengan `mode: "webhook"`.
 7. Buka domain Railway + `/health` → `{"ok":true,"mode":"webhook",...}`.
@@ -223,6 +229,15 @@ git push -u origin main
 | `XKIRO_MODEL_V2` / `XKIRO_MODEL_V3` | – | `XKIRO_MODEL` | Model khusus key ke-2/ke-3 |
 | `XKIRO_BASE_URL` | – | `https://api.xkiro.com/v1` | OpenAI-compatible endpoint |
 | `XKIRO_BASE_URL_V2` / `XKIRO_BASE_URL_V3` | – | `XKIRO_BASE_URL` | Endpoint khusus key ke-2/ke-3 |
+| `HERMES_ENABLED` | – | `true` | Aktifkan command `/hermes` |
+| `HERMES_API_KEY` | – | – | Key khusus Hermes; kalau kosong pakai 3 key xKiro di atas |
+| `HERMES_MODEL` | – | `XKIRO_MODEL` | Model untuk Hermes Agent |
+| `HERMES_BASE_URL` | – | `XKIRO_BASE_URL` | Endpoint OpenAI-compatible untuk Hermes |
+| `HERMES_CONTEXT_LENGTH` | – | `256000` | Context window (minimal 64000) |
+| `HERMES_TIMEOUT_MS` | – | `180000` | Batas waktu satu run agent |
+| `HERMES_MAX_CHARS` | – | `3500` | Panjang maksimal per balasan Telegram |
+| `HERMES_HOME` | – | `~/.hermes` | Data/config Hermes (Railway: `/app/.hermes`) |
+| `HERMES_BIN` | – | auto | Path binary Hermes (Railway: `/app/.hermes-bin/hermes`) |
 | `DEFAULT_PROVIDER` | – | `xkiro` → `xkirov2` → `xkirov3` → `gemini` → `groq` | Provider buat chat biasa |
 | `DEEP_PROVIDER` | – | `xkiro` → `xkirov2` → `xkirov3` → `gemini` → `groq` | Provider buat `/deep` & keyword analisa |
 | `GOOGLE_SHEETS_ID` | – | – | ID spreadsheet (boleh URL lengkap) |
@@ -266,6 +281,9 @@ Budget **tidak membatasi** provider apa pun — cuma dipakai buat laporan `/stat
 | `xKiro HTTP 401/403` | Key xKiro salah/revoked — cek `XKIRO_API_KEY` / `_V2` / `_V3`, lalu buat key baru di xkiro.com. Provider lain tetap dipakai sebagai fallback |
 | `xKiro HTTP 404` | Model harus format `vendor/model` dan tersedia; cek `XKIRO_MODEL` / `_V2` / `_V3` di `https://api.xkiro.com/v1/models` |
 | `xKiro 429 / cooldown` | Free tier kena limit — bot otomatis coba key xKiro berikutnya, lalu Gemini/Groq |
+| `/hermes` bilang `command not found` | Binary Hermes belum ke-install. Di Railway pastikan `railpack.json` ikut ter-commit; lokal bisa set `HERMES_BIN=/path/ke/hermes` |
+| `/hermes` timeout | Naikkan `HERMES_TIMEOUT_MS`; prompt terlalu berat atau xKiro sedang lambat |
+| `/hermes` 401/429 | Semua key xKiro kena limit — coba lagi nanti atau isi `HERMES_API_KEY` / refresh key |
 | `Sheets ... permission` | Spreadsheet belum di-share ke email service account (role Editor) |
 | `Sheets ... parse range` | Tab `messages` belum ada — bot harus jalan sekali dengan akses Sheets yang benar |
 | `GOOGLE_SA_B64 bukan JSON base64` | Jangan paste isi file mentah ke `.env`. Harus **base64 satu baris**: `base64 -w0 service-account.json` |
@@ -278,6 +296,7 @@ Budget **tidak membatasi** provider apa pun — cuma dipakai buat laporan `/stat
 - `.env` masuk `.gitignore`; key hanya di Railway Variables.
 - Semua pesan dari chat ID yang tidak di-whitelist diabaikan tanpa balasan.
 - Log tidak menyimpan isi lengkap prompt kecuali `prompt_chars` (jumlah karakter).
+- `/hermes` dijalankan dengan `--toolsets=` (tanpa terminal/file/browser) dan API key hanya dilewatkan lewat environment, tidak ditulis ke `config.yaml`.
 - Jangan commit service-account JSON.
 - Health endpoint hanya mengembalikan status, tanpa data sensitif.
 

@@ -6,6 +6,7 @@ import { availableProviders, getProvider } from "./providers/index.js";
 import { registerAdmin } from "./commands/admin.js";
 import { registerAsk } from "./commands/ask.js";
 import { registerBanding } from "./commands/banding.js";
+import { registerHermes } from "./commands/hermes.js";
 import { registerStats } from "./commands/stats.js";
 import { closeSheets, initSheets, sheetsReady } from "./sheets.js";
 import { logger } from "./util/logger.js";
@@ -52,6 +53,7 @@ registerAdmin(bot);
 registerBanding(bot);
 registerStats(bot);
 registerAsk(bot);
+registerHermes(bot);
 
 bot.catch(async (error) => {
   logger.error({ err: error.error }, "Unhandled bot error");
@@ -179,6 +181,7 @@ try {
     { command: "fast", description: "Model default (cepat/murah)" },
     { command: "deep", description: "Model deep (analisa)" },
     { command: "banding", description: "Bandingin dua model" },
+    { command: "hermes", description: "Jalankan Hermes Agent" },
     { command: "stats", description: "Pemakaian & biaya hari ini" },
     { command: "budget", description: "Sisa budget harian" },
     { command: "model", description: "Model yang aktif" },
