@@ -20,8 +20,14 @@ import { ProviderError } from "./util/errors.js";
 
 const MAX_PROMPT_CHARS = 6000;
 
-/** Urutan fallback: Gemini dulu (cepat & murah), lalu Groq. */
-const PREFERENCE: ProviderName[] = ["gemini", "groq"];
+/** Urutan fallback: 3 key xKiro dulu, baru Gemini/Groq. */
+const PREFERENCE: ProviderName[] = [
+  "xkiro",
+  "xkirov2",
+  "xkirov3",
+  "gemini",
+  "groq",
+];
 
 function buildOrder(primary: ProviderName): ProviderName[] {
   return [

@@ -12,6 +12,10 @@ const PRICES: Record<string, { input: number; output: number }> = {
   "openai/gpt-oss-20b": { input: 0.075, output: 0.3 },
   "qwen/qwen3.8-27b": { input: 0.29, output: 0.59 },
   "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
+  // xKiro — model free tier (harga di katalog: 0/0).
+  "mistralai/mistral-large-2512": { input: 0, output: 0 },
+  "mistralai/mistral-medium-3.5": { input: 0, output: 0 },
+  "cohere/command-a": { input: 0, output: 0 },
 };
 
 const FALLBACK = { input: 1, output: 3 };

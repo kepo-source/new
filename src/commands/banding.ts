@@ -58,7 +58,7 @@ export function registerBanding(bot: Bot): void {
 
     if (pair.length < 2) {
       await ctx.reply(
-        `🆚 /banding butuh dua provider berbeda.\nSekarang cuma aktif: ${providerLabel(config.defaultProvider)} (${getProvider(config.defaultProvider).model}).\n\nTambah key provider kedua (Gemini/Groq) kalau mau fitur banding.`,
+        `🆚 /banding butuh dua provider berbeda.\nSekarang cuma aktif: ${providerLabel(config.defaultProvider)} (${getProvider(config.defaultProvider).model}).\n\nTambah key provider kedua (Gemini/Groq/xKiro) kalau mau fitur banding.`,
       );
       return;
     }

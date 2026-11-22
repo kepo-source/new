@@ -64,7 +64,7 @@ export function registerAdmin(bot: Bot): void {
     lines.push(
       "",
       "Auto-route: pertanyaan analisa/strategi/prediksi → deep, sisanya default.",
-      "Limit/error di Gemini → otomatis pindah ke Groq.",
+      "Limit/error di satu provider → otomatis pindah ke provider lain yang aktif.",
       `Budget harian: $${config.budgetUsd.toFixed(2)} (info biaya, tidak membatasi provider)`,
     );
 

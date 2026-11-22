@@ -53,7 +53,7 @@ function textFromContent(
 
 /**
  * Provider untuk API yang kompatibel dengan OpenAI chat completions
- * (Groq Cloud dan endpoint OpenAI-compatible lainnya).
+ * (Groq Cloud, xKiro, dan endpoint OpenAI-compatible lainnya).
  */
 export function createOpenAiCompatibleProvider(
   options: OpenAiCompatibleConfig,

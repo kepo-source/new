@@ -55,14 +55,28 @@ function normalizeBaseUrl(raw: string, fallback: string): string {
 // === Provider LLM ===
 const geminiKey = optional("GEMINI_API_KEY");
 const groqKey = optional("GROQ_API_KEY");
+const xkiroKey = optional("XKIRO_API_KEY");
+const xkiroKeyV2 = optional("XKIRO_API_KEY_V2");
+const xkiroKeyV3 = optional("XKIRO_API_KEY_V3");
+
+const XKIRO_DEFAULT_MODEL = "mistralai/mistral-large-2512";
+const xkiroModel = optional("XKIRO_MODEL", XKIRO_DEFAULT_MODEL);
+const xkiroBaseUrl = normalizeBaseUrl(
+  optional("XKIRO_BASE_URL"),
+  "https://api.xkiro.com/v1",
+);
 
 const availableProviders: ProviderName[] = [];
+// Urutan prioritas: key xKiro dulu (3 akun), baru provider lama.
+if (xkiroKey) availableProviders.push("xkiro");
+if (xkiroKeyV2) availableProviders.push("xkirov2");
+if (xkiroKeyV3) availableProviders.push("xkirov3");
 if (geminiKey) availableProviders.push("gemini");
 if (groqKey) availableProviders.push("groq");
 
 if (availableProviders.length === 0) {
   throw new Error(
-    "Minimal satu provider LLM harus diisi: GEMINI_API_KEY atau GROQ_API_KEY.",
+    "Minimal satu provider LLM harus diisi: XKIRO_API_KEY (atau _V2/_V3), GEMINI_API_KEY, atau GROQ_API_KEY.",
   );
 }
 
@@ -116,12 +130,16 @@ function resolveProvider(
   return first;
 }
 
-const defaultProvider = resolveProvider("DEFAULT_PROVIDER", [
+const FALLBACK_ORDER: ProviderName[] = [
+  "xkiro",
+  "xkirov2",
+  "xkirov3",
   "gemini",
   "groq",
-]);
+];
 
-const deepProvider = resolveProvider("DEEP_PROVIDER", ["gemini", "groq"]);
+const defaultProvider = resolveProvider("DEFAULT_PROVIDER", FALLBACK_ORDER);
+const deepProvider = resolveProvider("DEEP_PROVIDER", FALLBACK_ORDER);
 
 export const config = {
   telegramToken: telegramToken(),
@@ -141,6 +159,21 @@ export const config = {
       optional("GROQ_BASE_URL"),
       "https://api.groq.com/openai/v1",
     ),
+  },
+  xkiro: {
+    apiKey: xkiroKey,
+    model: xkiroModel,
+    baseUrl: xkiroBaseUrl,
+  },
+  xkirov2: {
+    apiKey: xkiroKeyV2,
+    model: optional("XKIRO_MODEL_V2", xkiroModel),
+    baseUrl: normalizeBaseUrl(optional("XKIRO_BASE_URL_V2"), xkiroBaseUrl),
+  },
+  xkirov3: {
+    apiKey: xkiroKeyV3,
+    model: optional("XKIRO_MODEL_V3", xkiroModel),
+    baseUrl: normalizeBaseUrl(optional("XKIRO_BASE_URL_V3"), xkiroBaseUrl),
   },
   sheets: {
     spreadsheetId: normalizeSheetId(optional("GOOGLE_SHEETS_ID")),

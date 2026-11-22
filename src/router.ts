@@ -10,8 +10,7 @@ export interface RouteDecision {
  * Heuristik routing sederhana dan deterministik (tanpa panggilan LLM tambahan,
  * supaya cepat dan tidak menambah biaya).
  *
- * Pertanyaan "berat" diarahkan ke deep provider (Gemini/Groq), sisanya ke
- * default provider.
+ * Pertanyaan "berat" diarahkan ke deep provider, sisanya ke default provider.
  */
 const DEEP_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\banali(s|sa|sis|tik)\b/i, label: "analisa" },
