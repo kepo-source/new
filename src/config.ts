@@ -72,9 +72,7 @@ function positiveInt(name: string, fallback: number, min: number, max: number): 
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-// === Provider LLM ===
-const geminiKey = optional("GEMINI_API_KEY");
-const groqKey = optional("GROQ_API_KEY");
+// === Provider LLM (xKiro saja) ===
 const xkiroKey = optional("XKIRO_API_KEY");
 const xkiroKeyV2 = optional("XKIRO_API_KEY_V2");
 const xkiroKeyV3 = optional("XKIRO_API_KEY_V3");
@@ -87,46 +85,18 @@ const xkiroBaseUrl = normalizeBaseUrl(
 );
 
 const availableProviders: ProviderName[] = [];
-// Urutan prioritas: key xKiro dulu (3 akun), baru provider lama.
+// Urutan prioritas: 3 akun/key xKiro.
 if (xkiroKey) availableProviders.push("xkiro");
 if (xkiroKeyV2) availableProviders.push("xkirov2");
 if (xkiroKeyV3) availableProviders.push("xkirov3");
-if (geminiKey) availableProviders.push("gemini");
-if (groqKey) availableProviders.push("groq");
 
 if (availableProviders.length === 0) {
   throw new Error(
-    "Minimal satu provider LLM harus diisi: XKIRO_API_KEY (atau _V2/_V3), GEMINI_API_KEY, atau GROQ_API_KEY.",
+    "Minimal satu provider LLM harus diisi: XKIRO_API_KEY (atau _V2/_V3).",
   );
 }
 
 const configWarnings: string[] = [];
-
-export type GeminiThinkingLevel =
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
-
-const GEMINI_THINKING_LEVELS: GeminiThinkingLevel[] = [
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-];
-
-function geminiThinkingLevel(): GeminiThinkingLevel {
-  const raw = optional("GEMINI_THINKING_LEVEL", "low").toLowerCase();
-  if ((GEMINI_THINKING_LEVELS as string[]).includes(raw)) {
-    return raw as GeminiThinkingLevel;
-  }
-  configWarnings.push(
-    `GEMINI_THINKING_LEVEL=${raw} tidak dikenal. Pakai 'low'. Pilihan: ${GEMINI_THINKING_LEVELS.join(", ")}.`,
-  );
-  return "low";
-}
 
 function resolveProvider(
   envName: string,
@@ -150,13 +120,7 @@ function resolveProvider(
   return first;
 }
 
-const FALLBACK_ORDER: ProviderName[] = [
-  "xkiro",
-  "xkirov2",
-  "xkirov3",
-  "gemini",
-  "groq",
-];
+const FALLBACK_ORDER: ProviderName[] = ["xkiro", "xkirov2", "xkirov3"];
 
 const defaultProvider = resolveProvider("DEFAULT_PROVIDER", FALLBACK_ORDER);
 const deepProvider = resolveProvider("DEEP_PROVIDER", FALLBACK_ORDER);
@@ -167,19 +131,6 @@ export const config = {
   availableProviders,
   defaultProvider,
   deepProvider,
-  gemini: {
-    apiKey: geminiKey,
-    model: optional("GEMINI_MODEL", "gemini-3.5-flash-lite"),
-    thinkingLevel: geminiThinkingLevel(),
-  },
-  groq: {
-    apiKey: groqKey,
-    model: optional("GROQ_MODEL", "openai/gpt-oss-120b"),
-    baseUrl: normalizeBaseUrl(
-      optional("GROQ_BASE_URL"),
-      "https://api.groq.com/openai/v1",
-    ),
-  },
   xkiro: {
     apiKey: xkiroKey,
     model: xkiroModel,

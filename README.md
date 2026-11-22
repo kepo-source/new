@@ -2,13 +2,11 @@
 
 Bot Telegram **second brain** dengan **multi-model router**: model cepat buat kerja sehari-hari, model deep buat analisa berat, dan semua pemakaian dicatat ke **Google Sheets**.
 
-Defaultnya pakai **xKiro** dengan 3 key yang dipakai bergiliran. Kalau ketiganya kena limit/error, baru pindah ke **Gemini**, lalu **Groq**:
+Bot ini **khusus xKiro** — provider lain sudah dihapus. Tiga key dipakai bergiliran:
 
-- **xKiro** (api.xkiro.com) — provider utama, 3 akun/key: `xkiro` → `xkirov2` → `xkirov3` (OpenAI-compatible, model `vendor/model`)
-- **Gemini** (Google AI Studio) — fallback ke-4
-- **Groq** (Groq Cloud) — fallback terakhir (OpenAI-compatible)
+- **xKiro** (api.xkiro.com) — 3 akun/key: `xkiro` → `xkirov2` → `xkirov3` (OpenAI-compatible, model `vendor/model`)
 
-Cukup punya satu key xKiro; key ke-2/ke-3 sangat disarankan biar bot nggak berhenti saat free tier kena rate limit. Gemini/Groq tetap bisa dipakai sebagai cadangan.
+Kalau semua key kosong, bot **menolak start** dengan error yang jelas (tidak ada fallback diam-diam). Isi minimal satu key; key ke-2/ke-3 sangat disarankan biar bot nggak berhenti saat free tier kena rate limit.
 
 Ada juga **Hermes Agent** (Nous Research) lewat command `/hermes <tugas>`. Agent-nya memakai endpoint xKiro yang sama, jadi tidak perlu key baru. Toolset sengaja dimatikan — agent cuma berpikir & menjawab, tidak menjalankan shell/file dari Telegram.
 
@@ -18,7 +16,7 @@ Telegram ──▶ grammY (Node/TS)
                  ├─ AuthGuard (whitelist chat ID)
                  ├─ Router ──▶ default provider (xKiro)
                  │        └──▶ deep provider (xKiro)
-                 ├─ Fallback: xKiro → xKiro2 → xKiro3 → Gemini → Groq
+                 ├─ Fallback: xKiro → xKiro2 → xKiro3
                  └─ Logger (queue) ──▶ Google Sheets
 ```
 
@@ -26,7 +24,7 @@ Telegram ──▶ grammY (Node/TS)
 
 - Chat biasa langsung dijawab, model dipilih otomatis.
 - `/fast` pakai model default, `/deep` pakai model deep, `/banding` dua-duanya sekaligus.
-- Fallback otomatis: kalau satu provider kena rate limit/error, request langsung dialihkan ke provider aktif berikutnya (xKiro → xKiro 2 → xKiro 3 → Gemini → Groq).
+- Fallback otomatis: kalau satu key kena rate limit/error, request langsung dialihkan ke key xKiro berikutnya (xKiro → xKiro 2 → xKiro 3).
 - Provider yang kena 401/403 otomatis cooldown 15 menit (429 cooldown 60 detik), jadi chat berikutnya nggak nunggu provider rusak.
 - Konteks 6 putaran terakhir per chat (in-memory).
 - Log lengkap ke Sheets: model, token, latency, biaya, alasan routing.
@@ -63,7 +61,7 @@ src/
 ├── memory.ts           # konteks per chat
 ├── sheets.ts           # queue log ke Google Sheets
 ├── usage.ts            # budget & counter harian
-├── providers/          # xkiro.ts (3 key), gemini.ts, groq.ts (+ openai-compatible base)
+├── providers/          # xkiro.ts (3 key) + openai-compatible base
 ├── commands/           # admin, ask, banding, hermes, stats
 └── util/               # logger, cost, date, text, errors
 scripts/chat-id.ts      # bantu ambil chat ID
@@ -76,8 +74,6 @@ scripts/chat-id.ts      # bantu ambil chat ID
 - Node.js **22** (sesuai `engines` di package.json)
 - Bot Telegram dari [@BotFather](https://t.me/BotFather)
 - API key **xKiro** dari [xkiro.com](https://xkiro.com/) — provider utama; siapkan sampai 3 key (akun berbeda) buat rotasi
-- API key **Gemini** dari [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (format sekarang `AQ.…`) — opsional, cadangan
-- API key **Groq** dari [console.groq.com](https://console.groq.com) — opsional, cadangan terakhir
 - Google Cloud project + **service account** dengan Sheets API aktif (opsional, buat logging)
 
 ## 2. Setup lokal
@@ -103,7 +99,7 @@ DEFAULT_PROVIDER=xkiro
 DEEP_PROVIDER=xkiro
 ```
 
-Key yang kosong otomatis dilewati, jadi boleh isi satu dulu. Urutan fallback selalu `xkiro → xkirov2 → xkirov3 → gemini → groq` untuk provider yang keynya terisi.
+Minimal satu key wajib diisi; kalau kosong semua, bot error saat start. Urutan fallback selalu `xkiro → xkirov2 → xkirov3` untuk key yang terisi.
 
 Daftar model & harga: `https://api.xkiro.com/v1/models`. ID model wajib format `vendor/model` (mis. `mistralai/mistral-large-2512`). Bisa beda model per key lewat `XKIRO_MODEL_V2` / `XKIRO_MODEL_V3`.
 
@@ -189,8 +185,6 @@ git push -u origin main
 3. Tab **Variables**, copy semua isi `.env` (tanpa tanda kutip):
    - `TELEGRAM_BOT_TOKEN`
    - `ALLOWED_CHAT_IDS`
-   - `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL`
-   - `GROQ_API_KEY`, `GROQ_MODEL`
    - `XKIRO_API_KEY`, `XKIRO_API_KEY_V2`, `XKIRO_API_KEY_V3`, `XKIRO_MODEL`
    - `DEFAULT_PROVIDER`, `DEEP_PROVIDER`
    - `HERMES_ENABLED`, `HERMES_MODEL` (opsional; default sudah memakai xKiro)
@@ -216,12 +210,6 @@ git push -u origin main
 | `PUBLIC_DOMAIN` | – | `RAILWAY_PUBLIC_DOMAIN` | Domain webhook (tanpa `https://`) |
 | `TELEGRAM_WEBHOOK_SECRET` | – | turunan token | Secret header webhook, opsional |
 | `TELEGRAM_WEBHOOK_PATH` | – | `/telegram` | Prefix path webhook |
-| `GEMINI_API_KEY` | – | – | API key Google AI Studio (format sekarang `AQ.…`; key lama `AIza…` hanya jalan kalau masih aktif) |
-| `GEMINI_MODEL` | – | `gemini-3.5-flash-lite` | Model Gemini yang dipakai (paling cepat). `gemini-4-hydrogen` = lebih detail tapi lebih lambat |
-| `GEMINI_THINKING_LEVEL` | – | `low` | `minimal` / `low` / `medium` / `high` / `xhigh`. `low` = paling cepat; Gemini 4 tidak mendukung `minimal` |
-| `GROQ_API_KEY` | – | – | API key Groq Cloud (`gsk_...`) |
-| `GROQ_MODEL` | – | `openai/gpt-oss-120b` | Model Groq yang dipakai |
-| `GROQ_BASE_URL` | – | `https://api.groq.com/openai/v1` | OpenAI-compatible endpoint |
 | `XKIRO_API_KEY` | – | – | API key xKiro pertama (provider `xkiro`) |
 | `XKIRO_API_KEY_V2` | – | – | API key xKiro ke-2 (provider `xkirov2`) |
 | `XKIRO_API_KEY_V3` | – | – | API key xKiro ke-3 (provider `xkirov3`) |
@@ -238,8 +226,8 @@ git push -u origin main
 | `HERMES_MAX_CHARS` | – | `3500` | Panjang maksimal per balasan Telegram |
 | `HERMES_HOME` | – | `~/.hermes` | Data/config Hermes (Railway: `/app/.hermes`) |
 | `HERMES_BIN` | – | auto | Path binary Hermes (Railway: `/app/.hermes-bin/hermes`) |
-| `DEFAULT_PROVIDER` | – | `xkiro` → `xkirov2` → `xkirov3` → `gemini` → `groq` | Provider buat chat biasa |
-| `DEEP_PROVIDER` | – | `xkiro` → `xkirov2` → `xkirov3` → `gemini` → `groq` | Provider buat `/deep` & keyword analisa |
+| `DEFAULT_PROVIDER` | – | `xkiro` → `xkirov2` → `xkirov3` | Provider buat chat biasa |
+| `DEEP_PROVIDER` | – | `xkiro` → `xkirov2` → `xkirov3` | Provider buat `/deep` & keyword analisa |
 | `GOOGLE_SHEETS_ID` | – | – | ID spreadsheet (boleh URL lengkap) |
 | `GOOGLE_SA_B64` | – | – | Service account JSON, base64 |
 | `DAILY_BUDGET_USD` | – | `1.00` | Patokan budget untuk laporan biaya (tidak membatasi provider) |
@@ -248,19 +236,17 @@ git push -u origin main
 | `PORT` | – | `8080` | Diisi otomatis oleh Railway |
 | `HEALTH_PORT` | – | – | Opsional; menang atas `PORT`. Berguna kalau environment lokal sudah memakai `PORT` untuk hal lain (jangan diisi di Railway) |
 
-> Minimal satu dari `XKIRO_API_KEY` (atau `_V2`/`_V3`) / `GEMINI_API_KEY` / `GROQ_API_KEY` harus diisi, kalau tidak bot menolak start dengan pesan jelas. Urutan fallback selalu xKiro → xKiro 2 → xKiro 3 → Gemini → Groq untuk provider yang aktif.
+> Minimal satu dari `XKIRO_API_KEY` (atau `_V2`/`_V3`) harus diisi, kalau tidak bot menolak start dengan pesan jelas. Urutan fallback selalu xKiro → xKiro 2 → xKiro 3 untuk key yang aktif.
 
 ### Ganti model
 
-Cukup ubah env `XKIRO_MODEL` (atau `XKIRO_MODEL_V2`/`XKIRO_MODEL_V3`), `GEMINI_MODEL`, / `GROQ_MODEL`, restart. Kalau nama model salah, provider akan error dan bot kasih tahu di chat/log. Cek model xKiro yang tersedia di `https://api.xkiro.com/v1/models` (tanpa key juga bisa).
-
-Khusus Gemini, `GEMINI_THINKING_LEVEL` mengatur seberapa dalam model "berpikir" sebelum menjawab. Default `low` (paling cepat, tetap cukup detail). Naikkan ke `medium`/`high` kalau butuh jawaban lebih mendalam, atau turunkan ke `minimal` untuk model flash-lite kalau mau paling ngebut. Default `gemini-3.5-flash-lite` dipilih karena paling cepat (≈1 detik di testing); kalau butuh jawaban lebih dalam dan tidak masalah lebih lambat, pakai `GEMINI_MODEL=gemini-4-hydrogen`.
+Cukup ubah env `XKIRO_MODEL` (atau `XKIRO_MODEL_V2`/`XKIRO_MODEL_V3`), lalu restart. Kalau nama model salah, provider akan error dan bot kasih tahu di chat/log. Cek model xKiro yang tersedia di `https://api.xkiro.com/v1/models` (tanpa key juga bisa).
 
 ### Ubah aturan routing
 
 Edit `src/router.ts`, bagian `DEEP_PATTERNS`. Keyword yang match akan diarahkan ke `DEEP_PROVIDER`; sisanya `DEFAULT_PROVIDER`.
 
-Default: semua lewat xKiro. Kalau mau balik ke provider lama, set `DEFAULT_PROVIDER` / `DEEP_PROVIDER` ke `gemini` atau `groq`. Kalau cuma punya key Groq, set keduanya ke `groq` lalu ganti `GROQ_MODEL` ke model yang lebih kuat (misal `qwen/qwen3.8-27b` atau `openai/gpt-oss-120b`). Bisa juga set `DEFAULT_PROVIDER=xkirov2` kalau mau mulai dari key ke-2.
+Default: semua lewat xKiro. Bisa set `DEFAULT_PROVIDER=xkirov2` atau `xkirov3` kalau mau mulai dari key lain. `DEEP_PROVIDER` juga bisa diarahkan ke key berbeda.
 
 ## 6. Biaya
 
@@ -275,12 +261,12 @@ Budget **tidak membatasi** provider apa pun — cuma dipakai buat laporan `/stat
 | `Missing env var` | `.env` belum lengkap / Variables Railway belum diisi |
 | Bot diam saja | Chat ID belum masuk `ALLOWED_CHAT_IDS`, atau bot lain sedang polling dengan token sama |
 | `409 Conflict` | Ada dua instance bot jalan dengan token sama |
-| `Gemini HTTP 401` / `API key not valid` / `ACCESS_TOKEN_TYPE_UNSUPPORTED` | Key `AQ.…` belum aktif untuk Gemini API. Pastikan key dibuat di project yang sudah enable **Generative Language API** + billing, atau buat key baru di [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Kalau tetap gagal, itu masalah provisioning di sisi Google — pakai provider lain (xKiro/Groq) sementara |
-| `Groq HTTP 401` | `GROQ_API_KEY` salah/revoked — cek console.groq.com |
-| `Groq HTTP 404` | `GROQ_MODEL` tidak tersedia di akun lo; cek daftar model Groq |
-| `xKiro HTTP 401/403` | Key xKiro salah/revoked — cek `XKIRO_API_KEY` / `_V2` / `_V3`, lalu buat key baru di xkiro.com. Provider lain tetap dipakai sebagai fallback |
+| `DEFAULT_PROVIDER=xkiro tidak tersedia (key belum diisi)` | `XKIRO_API_KEY` kosong di service yang jalan. Pastikan Variable masuk ke **service yang benar** di Railway, lalu redeploy |
+| `Minimal satu provider LLM harus diisi: XKIRO_API_KEY (atau _V2/_V3)` | Semua key xKiro kosong — bot sengaja berhenti supaya masalah kelihatan jelas |
+| `xKiro HTTP 401/403` | Key xKiro salah/revoked — cek `XKIRO_API_KEY` / `_V2` / `_V3`, lalu buat key baru di xkiro.com |
 | `xKiro HTTP 404` | Model harus format `vendor/model` dan tersedia; cek `XKIRO_MODEL` / `_V2` / `_V3` di `https://api.xkiro.com/v1/models` |
-| `xKiro 429 / cooldown` | Free tier kena limit — bot otomatis coba key xKiro berikutnya, lalu Gemini/Groq |
+| `xKiro 429 / cooldown` | Free tier kena limit — bot otomatis coba key xKiro berikutnya |
+| `/health` masih nunjukin provider lama | Masih ada service/proses lama yang jalan dengan token bot sama. Matikan service lama itu — dia bisa rebut webhook Telegram |
 | `/hermes` bilang `command not found` | Binary Hermes belum ke-install. Di Railway pastikan `railpack.json` ikut ter-commit; lokal bisa set `HERMES_BIN=/path/ke/hermes` |
 | `/hermes` timeout | Naikkan `HERMES_TIMEOUT_MS`; prompt terlalu berat atau xKiro sedang lambat |
 | `/hermes` 401/429 | Semua key xKiro kena limit — coba lagi nanti atau isi `HERMES_API_KEY` / refresh key |
@@ -303,8 +289,8 @@ Budget **tidak membatasi** provider apa pun — cuma dipakai buat laporan `/stat
 ## 9. Roadmap
 
 - [ ] `/note`, `/cari`, `/rekap` (second brain penuh)
-- [ ] Voice note → transkrip Gemini
-- [ ] Foto/screenshot → Gemini vision
+- [ ] Voice note → transkrip via xKiro/endpoint audiotranskrip
+- [ ] Foto/screenshot → vision via xKiro
 - [ ] SQLite + Railway Volume untuk konteks permanen
 - [ ] Webhook mode (opsional, lebih hemat resource)
 - [ ] OpenCode tool: `/code <task>` untuk eksekusi coding dari Telegram
