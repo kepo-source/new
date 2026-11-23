@@ -12,7 +12,7 @@ Telegram ──▶ Hermes gateway
                  └─ plugin: batch log ke tab `messages` Google Sheet yang ada
 ```
 
-Semua state (config, `auth.json`, skills, plugin, sesi chat) ada di **Railway volume `/opt/data`**. Image tetap turunan `nousresearch/hermes-agent:latest` dengan entrypoint s6, `CMD ["gateway", "run"]`.
+Semua state (config, `auth.json`, skills, plugin, sesi chat) ada di **Railway volume `/opt/data`**. Image tetap turunan `nousresearch/hermes-agent:latest` dengan entrypoint s6, `CMD ["gateway", "run"]`. Di Railway, `startCommand` harus ditulis **`hermes gateway run`** (Railway mengeksekusi perintah itu langsung, tanpa entrypoint image) dan healthcheck HTTP dimatikan.
 
 ## Perintah
 
@@ -34,7 +34,7 @@ Semua state (config, `auth.json`, skills, plugin, sesi chat) ada di **Railway vo
 
 ```
 Dockerfile                         # FROM hermes-agent + seed + CMD gateway run
-railway.json                       # builder DOCKERFILE, tanpa healthcheck
+railway.json                       # builder DOCKERFILE, startCommand hermes gateway run, tanpa healthcheck
 hermes/init/03-seed-second-brain.sh# cont-init: seed /opt/data sekali saja
 hermes/seed/config.yaml            # model, providers, pool, fallback, Telegram
 hermes/seed/plugins/
