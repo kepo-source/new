@@ -10,12 +10,14 @@ model:
 providers:
   xkiro:
     name: xKiro
+    api: https://api.xkiro.com/v1
     base_url: https://api.xkiro.com/v1
     key_env: XKIRO_API_KEY
     model: mistralai/mistral-medium-3.5
     api_mode: chat_completions
   groq:
     name: Groq
+    api: https://api.groq.com/openai/v1
     base_url: https://api.groq.com/openai/v1
     key_env: GROQ_API_KEY
     api_mode: chat_completions
