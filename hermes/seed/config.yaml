@@ -1,0 +1,50 @@
+# Config Hermes untuk @badasht_bot (second-brain).
+# Semua secret ada di Railway Variables / ~/.hermes/.env, TIDAK di file ini.
+
+model:
+  provider: custom:xkiro
+  default: mistralai/mistral-medium-3.5
+  base_url: https://api.xkiro.com/v1
+  key_env: XKIRO_API_KEY
+
+providers:
+  xkiro:
+    name: xKiro
+    base_url: https://api.xkiro.com/v1
+    key_env: XKIRO_API_KEY
+    model: mistralai/mistral-medium-3.5
+    api_mode: chat_completions
+  groq:
+    name: Groq
+    base_url: https://api.groq.com/openai/v1
+    key_env: GROQ_API_KEY
+    api_mode: chat_completions
+
+# Rotasi 3 key xKiro sebelum pindah provider: utama → v2 → v3.
+credential_pool_strategies:
+  custom:xkiro: fill_first
+
+# Dipakai hanya kalau ketiga key xKiro kena quota/cooldown.
+fallback_providers:
+  - provider: gemini
+    model: gemini-3.5-flash-lite
+  - provider: custom:groq
+    model: openai/gpt-oss-120b
+    base_url: https://api.groq.com/openai/v1
+    key_env: GROQ_API_KEY
+    api_mode: chat_completions
+
+plugins:
+  enabled:
+    - second-brain-sheets
+
+platforms:
+  telegram:
+    enabled: true
+
+gateway:
+  unauthorized_dm_behavior: ignore
+
+agent:
+  max_turns: 40
+  gateway_timeout: 1800

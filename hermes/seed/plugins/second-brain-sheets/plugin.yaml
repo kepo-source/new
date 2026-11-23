@@ -1,0 +1,7 @@
+name: second-brain-sheets
+version: 1.0.0
+description: "Catat pemakaian LLM ke tab 'messages' Google Sheet yang sudah ada."
+author: "second-brain"
+hooks:
+  - pre_llm_call
+  - post_api_request

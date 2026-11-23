@@ -1,0 +1,15 @@
+name: second-brain
+description: Semua perintah second-brain (@badasht_bot) dalam satu bundel.
+skills:
+  - sb-help
+  - sb-ask
+  - sb-fast
+  - sb-deep
+  - sb-banding
+  - sb-stats
+  - sb-budget
+  - sb-model
+  - sb-reset
+instruction: |
+  Ini adalah bundel perintah second-brain. Tanyakan ke pengguna perintah mana yang
+  mau dipakai, atau tampilkan ringkasan /sb-help kalau tidak ada argumen.
