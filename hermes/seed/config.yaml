@@ -43,6 +43,11 @@ plugins:
 platforms:
   telegram:
     enabled: true
+    # Paksa chat whitelist memakai model utama walaupun ada session override lama.
+    channel_overrides:
+      "1721126502":
+        provider: custom:xkiro
+        model: mistralai/mistral-medium-3.5
 
 gateway:
   unauthorized_dm_behavior: ignore
